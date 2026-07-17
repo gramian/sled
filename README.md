@@ -43,9 +43,9 @@ SLED runs on a **DOS** (Disk Operating System) such as
 For an overview of provided symbols, special forms, builtin functions, and
 standard library see the [index](#index).
 
-* [Source Code Repository]()
-* [Release Download]()
-* [Backup Repository]()
+* [Source Code Repository](https://codeberg.org/gramian/sled)
+* [Release Download](https://codeberg.org/gramian/sled/releases/download/v0.1/SLED-0_1.ZIP)
+* [Backup Repository](https://github.com/gramian/sled)
 
 ## Data
 
