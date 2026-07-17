@@ -1,4 +1,4 @@
-# SLED - Schemy LISP for DOS
+# SLED - Schemy LISP en DOS
 
 ## Version (0.1) Features
 
