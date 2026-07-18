@@ -1,4 +1,4 @@
-;;;; Standard Library
+;;;; sled.scm (Standard Library)
 
 ;;; Aliases
 
@@ -13,21 +13,9 @@
 
 ;;; Functions
 
-;; Answers if first argument unary predicate applied to all second argument list elements is not NIL
-(define all? (lambda (f l)
-  (if (empty? l) true
-    (if (f (head l)) (self f (tail l))
-      nil))))
-
 ;; Answers if both arguments are not NIL
 (define and? (lambda (x y)
   (if x (empty? (empty? y)) nil)))
-
-;; Answers if first argument unary predicate applied to all second argument list elements is at least once not NIL
-(define any? (lambda (f l)
-  (if (empty? l) nil
-    (if (f (head l)) true
-      (self f (tail l))))))
 
 ;; Concatenate lists (non TC)
 (define append (lambda (l x)
@@ -38,11 +26,6 @@
 (define assert (lambda (x y)
   (if x nil
     (error y))))
-
-;; Test helper
-(define check (lambda (x y z)
-  (print x '- y _ _ (if z 'pass 'fail))
-  (newline)))
 
 ;; Returns composition of argument list of unary functions and innermost argument
 (define compose (lambda x
@@ -67,18 +50,6 @@
 ;; Answers if previous top-level evaluation raised an error
 (define error? (lambda ()
   (equiv? ans err)))
-
-;; Returns the list where the first argument predicate applied to each element of the second argument list is not NIL
-(define filter (lambda (f l)
-  (if (empty? l) nil
-    (if (f (head l))
-      (cons (head l) (self f (tail l)))
-      (self f (tail l))))))
-
-;; Returns the result of applying the first argument binary function to the accumulator and each list element
-(define foldl (lambda (f a l)
-  (if (empty? l) a
-    (self f (f a (head l)) (tail l)))))
 
 ;; Returns value to first argument key symbol in second argument association list
 (define get (lambda (x l)
@@ -155,14 +126,6 @@
   (if (empty? y) nil
     (if (empty? x) true
       (self (tail x) (tail y))))))
-
-;; Returns last argument via Takeuchi function
-(define tak (lambda (x y z)
-  (if (shorter? y x)
-      (self (self (tail x) y z)
-            (self (tail y) z x)
-            (self (tail z) x y))
-      z)))
 
 ;;; Your start-up code below:
 

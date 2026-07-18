@@ -1,6 +1,6 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.1) Features
+## Version (0.2) Features
 
 * Scheme-like
 * LISP Interpreter
@@ -14,7 +14,7 @@
 * ~1000 Lines of Code (C89)
 * 9 Special Forms
 * 18 Builtin Functions
-* 27 Function Standard Library
+* 21 Function Standard Library
 * 12K Executable
 * Open-Source (0BSD)
 
@@ -33,7 +33,7 @@
 SLED is a purely symbolic **LISP** (LISt Processor) with functionality (largely)
 inspired by **Scheme**. Originally derived from the fantastic
 [Kilo LISP](https://t3x.org/klisp), but reduced by some features such as macros,
-and enhanced by others. SLED can be classified as an Ur-Lisp.
+and enhanced with others. SLED can be classified as an Ur-Lisp.
 
 SLED runs on a **DOS** (Disk Operating System) such as
 [FreeDOS](https://freedos.org) or MS-DOS, as well as on DOS-emulators like
@@ -44,7 +44,7 @@ For an overview of provided symbols, special forms, builtin functions, and
 standard library see the [index](#index).
 
 * [Source Code Repository](https://codeberg.org/gramian/sled)
-* [Release Download](https://codeberg.org/gramian/sled/releases/download/v0.1/SLED-0_1.ZIP)
+* [Release Download](https://codeberg.org/gramian/sled/releases/download/v0.2/SLED-0_2.ZIP)
 * [Backup Repository](https://github.com/gramian/sled)
 
 ## Data
@@ -110,6 +110,8 @@ or as result of the `cons` builtin function:
 (cons 'a 'x)
 ```
 
+Pair elements (head and tail) are immutable.
+
 ### Lists
 
 A list is a set of pairs where each tail points to a distinct other pair except
@@ -132,7 +134,7 @@ A list can be created as data also by:
 or as result of the `list` function:
 
 ```
-(list 'a 'x)
+(list 'a 'b)
 ```
 
 #### Improper List
@@ -229,6 +231,19 @@ This means the function parameters can be set up in various ways:
 
 Optional arguments can be passed as a list, like `z` above.
 
+### Recursion
+
+LISPs rely on recursion instead of iteration. Recursion refers to a function
+calling itself. Two features of SLED help avoid a stack overflow in deep
+recursions: the trampoline evaluator and tail-call optimization (TCO). TCO
+works for `lambda`, `let`, and `begin`.
+
+### Errors
+
+An error during evaluation of an expression jumps back to the top-level, where
+an error occurance can be tested. An error cannot be caught inside an
+expression.
+
 ### Builtin Functions
 
 A set of functions is built into the SLED executable to enable interaction with
@@ -254,11 +269,15 @@ For details see the [index](#index).
 ### Immutability
 
 Special symbols, special forms, builtin functions, and standard library contents
-are immutable in SLED and cannot be shadowed.
+are immutable in SLED and cannot be shadowed. This includes custom extensions
+to the standard library.
 
 ## System
 
-### File Extension
+### File Names
+
+File names should follow DOS 8.3 naming (maximum 8 characters for the file name,
+a dot, maximum 3 characters for the file extension).
 
 The recommended file extension for scripts running on this LISP is `.scm` due to
 syntactic similarity to `Scheme`; for instance, the standard library is named
@@ -289,18 +308,17 @@ but after the standard library loaded:
 C:\> sled code.scm
 ```
 
-The third is an "ignore errors" switch `/i`, which causes execution of the file
-to continue even after errors occur:
-
-```cmd
-C:\> sled /i code.scm
-```
-
-The fourth is a "batch mode" switch `/b`, which behaves like `/i` but exits
-after execution:
+The third is an "batch mode" switch `/b`, which exits after execution:
 
 ```cmd
 C:\> sled /b code.scm
+```
+
+The fourth is a "ignore errors" switch `/i`, which behaves like `/b` but
+continues after an error occurs:
+
+```cmd
+C:\> sled /i code.scm
 ```
 
 The file path has to be the last argument.
@@ -340,7 +358,7 @@ sled> (println 'hello\ world)
 A pitfall is extended (two-byte) characters which are not supported. An example
 is using the arrow keys in the REPL, resulting in an `α` (alpha). These extended
 characters pollute the input stream and can cause an error in an input line even
-if deleted.
+if deleted. A new prompt via `CTRL+C` cleans the input stream.
 
 ### Exiting
 
@@ -413,50 +431,48 @@ functions, and standard library symbols.
 
 **Special Symbols**
 
-|                        |                        |                        |
-|------------------------|------------------------|------------------------|
-| [`$`](#-exit)          | [`?`](#-help)          | [`_`](#_-space)        |
-| [`ans`](#ans)          | [`err`](#err)          | [`nil`](#nil)          |
-| [`self`](#self)        | [`true`](#true)        | [`ver`](#ver)          |
+|                           |                 |                 |
+|---------------------------|-----------------|-----------------|
+| [`$`](#exit)              | [`?`](#help-1)  | [`_`](#_-space) |
+| [`ans`](#ans)             | [`err`](#err)   | [`nil`](#nil)   |
+| [`self`](#self-arg1-argn) | [`true`](#true) | [`ver`](#ver)   |
 
 **Special Forms**
 
-|                        |                        |                        |
-|------------------------|------------------------|------------------------|
-| [`apply`](#apply)      | [`begin`](#begin)      | [`comment`](#comment)  |
-| [`define`](#define)    | [`if`](#if)            | [`ifnil`](#ifnil)      |
-| [`lambda`](#lambda)    | [`let`](#let)          | [`quote`](#quote)      |
+|                                           |                             |                                 |
+|-------------------------------------------|-----------------------------|---------------------------------|
+| [`apply`](#apply-fun-lst)                 | [`begin`](#begin-arg1-argn) | [`comment`](#comment-arg1-argn) |
+| [`define`](#define-sym-arg)               | [`if`](#if-arg1-arg2-arg3)  | [`ifnil`](#ifnil-arg1-arg2)     |
+| [`lambda`](#lambda-arg1-argn-body1-bodyn) | [`let`](#let)               | [`quote`](#quote-sym)           |
 
 **Builtin Functions**
 
-|                        |                        |                        |
-|------------------------|------------------------|------------------------|
-| [`atom?`](#atom)       | [`cons`](#cons)        | [`defined?`](#defined) |
-| [`empty?`](#empty)     | [`env`](#env)          | [`eof?`](#eof)         |
-| [`equiv?`](#equiv)     | [`error`](#error)      | [`exit`](#exit)        |
-| [`gc`](#gc)            | [`head`](#head)        | [`load`](#load)        |
-| [`newline`](#newline)  | [`print`](#print)      | [`proc?`](#proc?)      |
-| [`read`](#read)        | [`symbol?`](#symbol)   | [`tail`](#tail)        |
+|                              |                             |                            |
+|------------------------------|-----------------------------|----------------------------|
+| [`atom?`](#atom-arg)         | [`cons`](#cons-arg1-arg2)   | [`defined?`](#defined-sym) |
+| [`empty?`](#empty-arg)       | [`env`](#env)               | [`eof?`](#eof-arg)         |
+| [`equiv?`](#equiv-arg1-arg2) | [`error`](#error-sym-arg)   | [`exit`](#exit-1)          |
+| [`gc`](#gc-arg)              | [`head`](#head-arg)         | [`load`](#load-sym-arg)    |
+| [`newline`](#newline)        | [`print`](#print-arg1-argn) | [`proc?`](#proc-arg)       |
+| [`read`](#read)              | [`symbol?`](#symbol-arg)    | [`tail`](#tail-arg)        |
 
 **Standard Aliases**
 
-|                        |                        |                        |
-|------------------------|------------------------|------------------------|
-| [`nil?`](#nil)         | [`not`](#not)          | [`zero?`](#zero)       |
+|                    |                   |                      |
+|--------------------|-------------------|----------------------|
+| [`nil?`](#nil-arg) | [`not`](#not-arg) | [`zero?`](#zero-arg) |
 
 **Standard Library**
 
-|                        |                        |                        |
-|------------------------|------------------------|------------------------|
-| [`all?`](#all)         | [`and?`](#and)         | [`any?`](#any)         |
-| [`append`](#append)    | [`assert`](#assert)    | [`check`](#check)      |
-| [`compose`](#compose)  | [`equal?`](#equal)     | [`dec`](#dec)          |
-| [`error?`](#error-1)   | [`filter`](#filter)    | [`foldl`](#foldl)      |
-| [`get`](#get)          | [`id`](#id)            | [`inc`](#inc)          |
-| [`list`](#list)        | [`list?`](#list-1)     | [`map`](#map)          |
-| [`member`](#member)    | [`or?`](#or)           | [`pair?`](#pair)       |
-| [`printid`](#printid)  | [`println`](#println)  | [`put`](#put)          |
-| [`reverse`](#reverse)  | [`shorter?`](#shorter) | [`tak`](#tak)          |
+|                                     |                                 |                                  |
+|-------------------------------------|---------------------------------|----------------------------------|
+| [`and?`](#and-arg1-arg2)            | [`append`](#append-lst1-lst2)   | [`assert`](#assert-arg-sym)      |
+| [`compose`](#compose-arg-fun1-funn) | [`equal?`](#equal-arg1-arg2)    | [`dec`](#dec-arg)                |
+| [`error?`](#error-1)                | [`get`](#get)                   | [`id`](#id-arg)                  |
+| [`inc`](#inc-arg)                   | [`list`](#list-arg1-argn)       | [`list?`](#list-arg)             |
+| [`map`](#map-fun-lst)               | [`member`](#member)             | [`or?`](#or-arg1-arg2)           |
+| [`pair?`](#pair-arg)                | [`printid`](#printid-arg1-arg2) | [`println`](#println-arg1-argn)  |
+| [`put`](#put-lst-sym-arg)           | [`reverse`](#reverse-lst)       | [`shorter?`](#shorter-lst1-lst2) |
 
 ---
 
@@ -476,29 +492,14 @@ and the standard library. Works only from the prompt.
 
 ### `_` {space}
 
-This **special symbol** is an alias for a space `'\ `.
-
----
-
-### `all? <fun> <lst>`
-
-This **standard library** binary predicate answers if the first function
-argument applied to each element of the second list argument never results in
-`nil`.
-
-```
-(all? (lambda (x) x) (list true true true))  ; → true
-(all? (lambda (x) x) (list nil true true))   ; → nil
-(all? (lambda (x) x) (list true nil true))   ; → nil
-(all? (lambda (x) x) (list true true nil))   ; → nil
-```
+This **special symbol** is an alias for a space character `'\ `.
 
 ---
 
 ### `and? <arg1> <arg2>`
 
 This **standard library** binary predicate answers if both arguments are not
-`nil`; use to make compound conditionals easier.
+`nil`; use to make compound conditionals simpler.
 
 ```
 (and? nil nil)    ; → nil
@@ -521,21 +522,6 @@ tested for with `error?`.
 
 ```
 ans
-```
-
----
-
-### `any? <fun> <lst>`
-
-This **standard library** binary predicate answers if the first function
-argument applied to each element of the second list argument at least once
-does not in result in `nil`.
-
-```
-(any? (lambda (x) x) (list nil nil nil))   ; → nil
-(any? (lambda (x) x) (list true nil nil))  ; → true
-(any? (lambda (x) x) (list nil true nil))  ; → true
-(any? (lambda (x) x) (list nil nil true))  ; → true
 ```
 
 ---
@@ -600,18 +586,6 @@ argument's return value.
 
 ---
 
-### `check <sym1> <sym2> <arg>`
-
-This **standard library** function prints the first argument symbol (group), the
-second argument symbol (index), and evaluates the third argument. If it results
-in `nil`, `fail` is printed, `pass` otherwise. Use for testing.
-
-```
-(check 'misc 'a nil)
-```
-
----
-
 ### `comment <arg1> ... <argN>`
 
 This **special form** is ignored by the parser. Use as block comment.
@@ -624,7 +598,7 @@ This **special form** is ignored by the parser. Use as block comment.
 
 ---
  
-### `compose <arg> <sym1> ... <symN>`
+### `compose <arg> <fun1> ... <funN>`
 
 This **standard library** variadic function pipelines unary functions:
 the second argument is applied to the first argument,
@@ -662,11 +636,14 @@ not empty; use to decrement von Neumann ordinals.
 ### `define <sym> <arg>`
 
 This **special form** creates a new binding of the second argument to the first
-argument symbol, and returns the second argument.
+argument symbol, and returns the second argument. Bindings can be re-`defined`.
 
 ```
 (define hello 'world)  ; → world
 ```
+
+> **NOTE:** `define` always affect the global binding, also when used inside
+            `let` or `lambda`.
 
 ---
 
@@ -694,7 +671,7 @@ This **builtin** unary predicate answers if its argument is the empty list.
 
 ### `env`
 
-This **builtin** thunk prints the currently user-defined symbols.
+This **builtin** thunk prints the current user-defined symbols.
 
 ```
 (env)
@@ -705,7 +682,7 @@ This **builtin** thunk prints the currently user-defined symbols.
 ### `eof? <arg>`
 
 This **builtin** unary predicate answers if its argument evaluates to an
-end-of-file or end-of-transmission symbol.
+end-of-file (EOF) or end-of-transmission (EOT) symbol.
 
 ```
 (ifnil (eof? (read)) 'none)
@@ -778,35 +755,10 @@ This **builtin** thunk quits the interpreter or REPL.
 
 ---
 
-### `filter <fun> <lst>`
-
-This **standard library** binary function applies the argument predicate to
-each element of the argument list and returns the list of elements for which
-the predicate is not `nil`.
-
-```
-(filter empty? '(nil true))  ; → (nil)
-```
-
----
-
-### `foldl <fun> <arg> <lst>`
-
-This **standard library** function applies the argument binary function to the
-(argument) accumulator and each element of the argument list and stores the
-result in the accumulator which is returned.
-
-```
-(foldl (lambda (a x) (inc a)) nil '(a b c))  ; → (nil nil nil)
-```
-
-
----
-
 ### `gc [<arg>]`
 
 This **builtin** procedure triggers garbage collection. Node usage is printed if
-an <arg> is provided which is not `nil`.
+an argument is provided which is not `nil`.
 
 ```
 (gc)       ; → 
@@ -831,7 +783,7 @@ otherwise.
 
 ### `head <arg>`
 
-This **builtin** unary function returns the head part of a cons cell.
+This **builtin** unary function returns the head part of a cons cell or list.
 
 ```
 (head (cons 'a 'b))  ; → a
@@ -940,13 +892,15 @@ list.
 
 ---
 
-### `load <sym>`
+### `load <sym> [<arg>]`
 
 This **builtin** unary function evaluates the contents of the file given by the
-argument symbol (path) and returns the last answer.
+argument symbol (path) and returns the last answer. If a second argument which
+is not `nil` is given then errors are ignored during loading.
 
 ```
 (load 'myscript.scm)
+(load 'myscript.scm true)
 ```
 
 > **NOTE:** Loads can be nested twice at most.
@@ -1024,7 +978,7 @@ This is a **standard alias** for `empty?`; use for inverting predicate results.
 ### `or? <arg1> <arg2>`
 
 This **standard library** binary predicate answers if any argument is not `nil`;
-meant to simplify compound conditionals.
+use to simplify compound conditionals.
 
 ```
 (or? nil nil)    ; → nil
@@ -1066,7 +1020,7 @@ This **builtin** variadic procedure prints its arguments to the standard output.
 
 ### `printid <arg1> [<arg2>]`
 
-This **standard library** procedure returns the first argument after printing
+This **standard library** function returns the first argument after printing
 it and a line break; if given the second argument is printed before the first.
 
 ```
@@ -1103,7 +1057,7 @@ a lambda. For special forms and builtin functions this predicate returns `nil`.
 
 ### `put <lst> <sym> <arg>`
 
-This **standard library** function updates the first argument association
+This **standard library** function returns an updated first argument association
 list by setting the tail of the pair with the second argument symbol as head, or
 adding a pair with the second argument symbol as head and the third argument as
 tail, if no pair with the second argument symbol as head is listed in the first
@@ -1154,8 +1108,8 @@ This **standard library** unary function reverses its list argument.
 
 ### `self <arg1> ... <argN>`
 
-This **special symbol** enables anonymous recursion. Inside a closure it
-resolves to the enclosing lambda.
+This **special symbol** enables anonymous recursion. Inside any closure it
+resolves to the enclosing `lambda`. Outside a `lambda`, `self` is undefined.
 
 ```
 ((lambda (x)
@@ -1199,19 +1153,6 @@ This **builtin** unary function returns the tail part of a cons cell.
 
 ---
 
-### `tak <lst1> <lst2> <lst3>` 
-
-This **standard library** function implements the highly recursive Takeuchi
-function. Use as a benchmark (see:
-[1](https://archive.org/details/AcornUser047-Jun86/page/n179/mode/2up) &
-[2](https://archive.org/details/AcornUser052-Nov86/page/n197/mode/2up)).
-
-```
-(tak '() '() '(nil))  ; → (nil)
-```
-
----
-
 ### `true`
 
 This **special symbol** evaluates to true. Use as a generic true value.
@@ -1227,12 +1168,12 @@ true  ; → true
 This **special symbol** evaluates to a symbol pinpointing the version of SLED.
 
 ```
-ver  ; → sled-0.1
+ver  ; → sled-0.2
 ```
 
 ---
 
-### `zero?`
+### `zero? <arg>`
 
 This is a **standard alias** for `empty?`; use for testing von Neumann ordinals.
 

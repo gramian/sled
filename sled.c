@@ -1,5 +1,5 @@
 #define NAME "sled"
-#define VERSION "0.1"
+#define VERSION "0.2"
 #define TITLE "SLED - Schemy LISP en DOS (" VERSION ")"
 
 #if !defined(__SMALL__) && !defined(M_I86SM) && !defined(_M_I86SM)
@@ -345,7 +345,7 @@ bool malformed(node p) /*pure*/ {
 
 // Garbage Collection ##########################################################
 
-// Deutsch–Schorr–Waite algorithm  TODO
+// Deutsch–Schorr–Waite algorithm
 void mark(node n) {
     node p = NIL, t;
     if  ((n < NRESERVED) || (n >= SPCL)) return;
@@ -557,7 +557,7 @@ int parse_skip(void) {
 
 node parse(void);
 
-// Parse rooted tree TODO
+// Parse rooted tree
 node parse_list(void) {
     node n, c, t = NIL, err = NIL;
     bool entered = Skip;

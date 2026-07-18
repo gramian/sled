@@ -1,5 +1,10 @@
 ;;;; tests.scm
 
+;; Test helper
+(define check (lambda (x y z)
+  (print x '- y _ _ (if z 'pass 'fail))
+  (newline)))
+
 ;;; Special Symbols ############################################################
 
 (println 'special _ 'symbols)
@@ -44,7 +49,7 @@
 
 ;; ver
 
-(check 'ver 'a (equiv? ver 'sled-0.1))
+(check 'ver 'a (equiv? ver 'sled-0.2))
 
 (newline)
 
@@ -358,20 +363,6 @@
 
 (newline)
 
-;; all?
-
-(check 'all? 'a (all? id '(true true true)))
-
-(check 'all? 'b (not (all? id '(nil true true))))
-
-(check 'all? 'c (not (all? id '(true nil true))))
-
-(check 'all? 'd (not (all? id '(true true nil))))
-
-(check 'all? 'e (all? id nil))
-
-(newline)
-
 ;; and?
 
 (check 'and? 'a (not (and? nil nil)))
@@ -381,22 +372,6 @@
 (check 'and? 'c (not (and? true nil)))
 
 (check 'and? 'd (and? true true))
-
-(newline)
-
-;; any?
-
-(check 'any? 'a (any? id '(true true true)))
-
-(check 'any? 'b (any? id '(true nil nil)))
-
-(check 'any? 'c (any? id '(nil true nil)))
-
-(check 'any? 'd (any? id '(nil nil true)))
-
-(check 'any? 'e (not (any? id '(nil nil nil))))
-
-(check 'any? 'f (not (any? id nil)))
 
 (newline)
 
@@ -643,8 +618,3 @@
 (check 'shorter? 'd (not (shorter? '(nil) '(nil))))
 
 (newline)
-
-;; tak
-
-; test manually
-
