@@ -5,6 +5,44 @@
   (print x '- y _ _ (if z 'pass 'fail))
   (newline)))
 
+;;; Reader #####################################################################
+
+(println 'reader)
+
+(check 'reader 'a (equiv? 'ABC 'abc))
+
+(check 'reader 'b (equal? '(a . (b)) '(a b)))
+
+(check 'reader 'c (equal? '(a b . c) (cons 'a (cons 'b 'c))))
+
+(check 'reader 'd (equal? '(a . b) (cons 'a 'b)))
+
+(check 'reader 'e (symbol? '\;))
+
+(check 'reader 'f (symbol? '\.))
+
+(check 'reader 'g (symbol? 'abcdefghijklmnop))
+
+abcdefghijklmnopq
+
+(check 'reader 'h (error?))
+
+nil
+
+)
+
+(check 'reader 'i (error?))
+
+nil
+
+.
+
+(check 'reader 'j (error?))
+
+nil
+
+(newline)
+
 ;;; Special Symbols ############################################################
 
 (println 'special _ 'symbols)
@@ -21,6 +59,10 @@
 
 ;; err
 
+(check 'err 'a (symbol? err))
+
+(newline)
+
 ;; nil
 
 (check 'nil 'a (not nil))
@@ -33,23 +75,29 @@
 
 ;; self
 
-;; space
+(define count (lambda (l) (if (empty? l) 'done (self (tail l)))))
 
-(check 'space 'a (equiv? _ '\ ))
+(check 'self 'a (equiv? (count '(a b c)) 'done))
+
+(check 'self 'b (proc? (lambda (x) self)))
 
 (newline)
 
 ;; true
 
-(check 'true 'a true)
+(check 'true 'a (symbol? true))
 
-(check 'true 'b (not (not true)))
+(check 'true 'b true)
+
+(check 'true 'c (not (not true)))
 
 (newline)
 
 ;; ver
 
-(check 'ver 'a (equiv? ver 'sled-0.2))
+(check 'ver 'a (symbol? ver))
+
+(check 'ver 'b (equiv? ver 'sled-0.3))
 
 (newline)
 
@@ -59,15 +107,13 @@
 
 (newline)
 
-;; apply
-
-(check 'apply 'a (apply id '(true)))
-
-(newline)
-
 ;; begin
 
-(check 'begin 'a (equiv? (begin 'x 'y) 'y))
+(check 'begin 'a (equiv? (begin) nil))
+
+(check 'begin 'b (equiv? (begin 'x) 'x))
+
+(check 'begin 'c (equiv? (begin 'x 'y) 'y))
 
 (newline)
 
@@ -80,6 +126,8 @@
 ;; define
 
 (check 'define 'a (equiv? (define x 'y) 'y))
+
+(check 'define 'b (equiv? x 'y))
 
 (newline)
 
@@ -94,6 +142,8 @@
 (check 'if 'd (equiv? (if '() 'x 'y) 'y))
 
 (check 'if 'e (equiv? (if nil 'x (if nil 'x 'y)) 'y))
+
+(check 'if 'f (equiv? (if true 'x) 'x))
 
 (newline)
 
@@ -119,7 +169,7 @@
 
 (check 'lambda 'd (equiv? ((lambda (x y) y) 'a 'b) 'b))
 
-(check 'lambda 'e (equiv? ((lambda (x) 'ignored x) 'a) 'a))
+(check 'lambda 'e (equiv? ((lambda (x) 'z x) 'a) 'a))
 
 (check 'lambda 'f (equiv? ((lambda (x) ((lambda (y) y) x)) 'hi) 'hi))
 
@@ -139,11 +189,27 @@
 
 (check 'quote 'a (equiv? (quote x) 'x))
 
+(check 'quote 'b (equal? ''x '(quote x)))
+
+(check 'quote 'c (equal? '(a b) (cons 'a (cons 'b nil))))
+
+(check 'quote 'd (equiv? (head ''x) 'quote))
+
 (newline)
 
 ;;; Builtin Functions ##########################################################
 
 (println 'builtin _ 'functions)
+
+(newline)
+
+;; apply
+
+(check 'apply 'a (apply id '(true)))
+
+(check 'apply 'b (equal? (apply cons '(a b)) '(a . b)))
+
+(check 'apply 'c (equal? (apply list '(a b c)) '(a b c)))
 
 (newline)
 
@@ -183,7 +249,9 @@
 
 (check 'defined? 'c (defined? 'ver))
 
-(check 'defined? 'd (not (defined? 'this-does-exist)))
+(check 'defined? 'd (not (defined? 'no-such-symbol)))
+
+(check 'defined? 'e (symbol? 'abcdefghijklmnop))
 
 (newline)
 
@@ -225,6 +293,9 @@
 
 (check 'eof? 'g (not (eof? (lambda (x) x))))
 
+(check 'eof? 'h (eof? (read)))  ; the two following line breaks are important here
+
+
 (newline)
 
 ;; equiv?
@@ -257,7 +328,11 @@
 
 ;; error
 
-; test manually
+(error 'test)
+
+(check 'error 'a (error?))
+
+(newline)
 
 ;; exit
 
@@ -301,13 +376,19 @@
 
 (check 'proc? 'f (not (proc? '(x))))
 
-(check 'proc? 'g (proc? (lambda (x) x)))
+(check 'proc? 'g (not (proc? if)))
+
+(check 'proc? 'h (proc? proc?))
+
+(check 'proc? 'i (proc? (lambda (x) x)))
 
 (newline)
 
 ;; read
 
-; test manually
+(check 'read 'a (equiv? (read) 'datum)) datum
+
+(newline)
 
 ;; symbol?
 
@@ -337,23 +418,57 @@
 
 (newline)
 
+;; value
+
+(check 'value 'a (equiv? (value 'ver) 'sled-0.3))
+
+(define aa 'x)
+
+(check 'value 'b (equiv? (value 'aa) 'x))
+
+(check 'value 'c (equiv? (let (dd 'z) (value 'dd)) 'z))
+
+(newline)
+
 ;;; Standard aliases ###########################################################
+
+(println 'standard _ 'aliases)
+
+(newline)
+
+;; space
+
+(check 'space 'a (equiv? _ '\ ))
+
+(newline)
+
+;; br
+
+(check 'br 'a (equiv? br newline))
+
+(newline)
 
 ;; nil?
 
-(check 'nil? 'a (equiv? nil? 'empty?))
+(check 'nil? 'a (equiv? nil? empty?))
 
 (newline)
 
 ;; not
 
-(check 'not 'a (equiv? not 'empty?))
+(check 'not 'a (equiv? not empty?))
+
+(newline)
+
+;; quit
+
+(check 'quit 'a (equiv? quit exit))
 
 (newline)
 
 ;; zero?
 
-(check 'not 'a (equiv? zero? 'empty?))
+(check 'zero? 'a (equiv? zero? empty?))
 
 (newline)
 
@@ -373,6 +488,8 @@
 
 (check 'and? 'd (and? true true))
 
+(check 'and? 'e (equiv? (and? 'x 'y) true))
+
 (newline)
 
 ;; append
@@ -389,6 +506,8 @@
 
 (check 'append 'f (equal? (append '(a) '(b c)) '(a b c)))
 
+(check 'append 'g (equal? (append '(a) 'b) '(a . b)))
+
 (newline)
 
 ;; assert
@@ -400,6 +519,8 @@
 (assert true 'test)
 
 (check 'assert 'b (not (error?)))
+
+(check 'assert 'c (assert true 'test))
 
 (newline)
 
@@ -445,6 +566,12 @@
 
 (check 'equal? 'i (not (equal? '(a (b c)) '(a (b (c))))))
 
+(check 'equal? 'j (equal? '(a . b) '(a . b)))
+
+(check 'equal? 'k (not (equal? '(a . b) '(a b))))
+
+(check 'equal? 'l (not (equal? '(a . b) '(a . c))))
+
 (newline)
 
 ;; error?
@@ -453,23 +580,25 @@
 
 (check 'error? 'a (error?))
 
+'test
+
 (check 'error? 'b (not (error?)))
 
 (newline)
 
 ;; get
 
-(check 'get 'a (equiv? (get 'a '((a . x) (b . y) (c . z))) 'x))
+(check 'get 'a (equiv? (get '((a . x) (b . y) (c . z)) 'a) 'x))
 
-(check 'get 'b (equiv? (get 'b '((a . x) (b . y) (c . z))) 'y))
+(check 'get 'b (equiv? (get '((a . x) (b . y) (c . z)) 'b) 'y))
 
-(check 'get 'c (equiv? (get 'c '((a . x) (b . y) (c . z))) 'z))
+(check 'get 'c (equiv? (get '((a . x) (b . y) (c . z)) 'c) 'z))
 
-(check 'get 'd (equiv? (get 'd '((a . x) (b . y) (c . z))) nil))
+(check 'get 'd (equiv? (get '((a . x) (b . y) (c . z)) 'd) nil))
 
-(check 'get 'e (equiv? (get nil '((a . x) (nil . y))) 'y))
+(check 'get 'e (equiv? (get '((a . x) (nil . y)) nil) 'y))
 
-(check 'get 'f (equiv? (get 'a nil) nil))
+(check 'get 'f (equiv? (get nil 'a) nil))
 
 (check 'get 'g (equiv? (get nil nil) nil))
 
@@ -527,6 +656,8 @@
 
 (check 'map 'c (equal? (map (lambda (x) 'b) '(a a)) '(b b)))
 
+(check 'map 'd (equal? (map head '((a) (b) (c))) '(a b c)))
+
 (newline)
 
 ;; member
@@ -537,7 +668,9 @@
 
 (check 'member 'c (equal? (member 'b '(b c)) '(b c)))
 
-(check 'member 'd (equal? (member 'b '(c)) nil))
+(check 'member 'd (equal? (member 'b '(a b c)) '(b c)))
+
+(check 'member 'e (equal? (member 'b '(c)) nil))
 
 (newline)
 
@@ -616,5 +749,11 @@
 (check 'shorter? 'c (not (shorter? '(nil) nil)))
 
 (check 'shorter? 'd (not (shorter? '(nil) '(nil))))
+
+(check 'shorter? 'e (shorter? '(nil) '(nil nil)))
+
+(check 'shorter? 'f (not (shorter? '(nil nil) '(nil))))
+
+(check 'shorter? 'g (not (shorter? '(nil nil) '(nil nil))))
 
 (newline)
