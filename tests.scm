@@ -1,13 +1,22 @@
 ;;;; tests.scm
 
+;; Test report
+(define report nil)
+
 ;; Test helper
 (define check (lambda (x y z)
   (print x '- y _ _ (if z 'pass 'fail))
+  (define report (if z report (cons (cons x y) report)))
+  (newline)))
+
+;; Print header
+(define header (lambda x
+  (apply println (cons '\#\# (cons _ x)))
   (newline)))
 
 ;;; Reader #####################################################################
 
-(println 'reader)
+(header 'reader)
 
 (check 'reader 'a (equiv? 'ABC 'abc))
 
@@ -41,13 +50,13 @@ nil
 
 nil
 
+(check 'reader 'k (symbol? 'ok))
+
 (newline)
 
 ;;; Special Symbols ############################################################
 
-(println 'special _ 'symbols)
-
-(newline)
+(header 'special _ 'symbols)
 
 ;; ans
 
@@ -97,15 +106,13 @@ nil
 
 (check 'ver 'a (symbol? ver))
 
-(check 'ver 'b (equiv? ver 'sled-0.3))
+(check 'ver 'b (equiv? ver 'sled-0.4))
 
 (newline)
 
 ;;; Special Forms ##############################################################
 
-(println 'special _ 'forms)
-
-(newline)
+(header 'special _ 'forms)
 
 ;; begin
 
@@ -120,6 +127,8 @@ nil
 ;; comment
 
 (check 'comment 'a (comment nil) true)
+
+(check 'comment 'b (comment (a (b c))) true)
 
 (newline)
 
@@ -177,11 +186,21 @@ nil
 
 (check 'lambda 'h (equal? ((lambda x x) 'a 'b 'c) '(a b c)))
 
+(check 'lambda 'i (equiv? (((lambda (x) (lambda (y) x)) 'a) 'b) 'a))
+
+(check 'lambda 'j (equiv? ((lambda (x) ((lambda (x) x) 'y)) 'z) 'y))
+
+(check 'lambda 'k (equiv? ((lambda (x) (begin ((lambda (x) x) 'y) x)) 'z) 'z))
+
 (newline)
 
 ;; let
 
 (check 'let 'a (equiv? (let (x 'y) x) 'y))
+
+(check 'let 'b (equiv? (let (x 'z) x) 'z))  ; global: x -> 'y
+
+(check 'let 'c (equiv? (begin (let (x 'z) x) x) 'y))
 
 (newline)
 
@@ -199,9 +218,7 @@ nil
 
 ;;; Builtin Functions ##########################################################
 
-(println 'builtin _ 'functions)
-
-(newline)
+(header 'builtin _ 'functions)
 
 ;; apply
 
@@ -251,7 +268,7 @@ nil
 
 (check 'defined? 'd (not (defined? 'no-such-symbol)))
 
-(check 'defined? 'e (symbol? 'abcdefghijklmnop))
+(check 'defined? 'e (not (let (dd 'z) (defined? 'dd))))
 
 (newline)
 
@@ -292,9 +309,6 @@ nil
 (check 'eof? 'f (not (eof? '(x))))
 
 (check 'eof? 'g (not (eof? (lambda (x) x))))
-
-(check 'eof? 'h (eof? (read)))  ; the two following line breaks are important here
-
 
 (newline)
 
@@ -354,6 +368,8 @@ nil
 
 ;; load
 
+; test manually
+
 ;; newline
 
 ; test manually
@@ -386,9 +402,11 @@ nil
 
 ;; read
 
-(check 'read 'a (equiv? (read) 'datum)) datum
+; test manually
 
-(newline)
+;; restart
+
+; test manually
 
 ;; symbol?
 
@@ -420,7 +438,7 @@ nil
 
 ;; value
 
-(check 'value 'a (equiv? (value 'ver) 'sled-0.3))
+(check 'value 'a (equiv? (value 'ver) 'sled-0.4))
 
 (define aa 'x)
 
@@ -432,9 +450,7 @@ nil
 
 ;;; Standard aliases ###########################################################
 
-(println 'standard _ 'aliases)
-
-(newline)
+(header 'standard _ 'aliases)
 
 ;; space
 
@@ -474,9 +490,7 @@ nil
 
 ;;; Standard library ###########################################################
 
-(println 'standard _ 'library)
-
-(newline)
+(header 'standard _ 'library)
 
 ;; and?
 
@@ -588,17 +602,17 @@ nil
 
 ;; get
 
-(check 'get 'a (equiv? (get '((a . x) (b . y) (c . z)) 'a) 'x))
+(check 'get 'a (equiv? (get 'a '((a . x) (b . y) (c . z))) 'x))
 
-(check 'get 'b (equiv? (get '((a . x) (b . y) (c . z)) 'b) 'y))
+(check 'get 'b (equiv? (get 'b '((a . x) (b . y) (c . z))) 'y))
 
-(check 'get 'c (equiv? (get '((a . x) (b . y) (c . z)) 'c) 'z))
+(check 'get 'c (equiv? (get 'c '((a . x) (b . y) (c . z))) 'z))
 
-(check 'get 'd (equiv? (get '((a . x) (b . y) (c . z)) 'd) nil))
+(check 'get 'd (equiv? (get 'd '((a . x) (b . y) (c . z))) nil))
 
-(check 'get 'e (equiv? (get '((a . x) (nil . y)) nil) 'y))
+(check 'get 'e (equiv? (get nil '((a . x) (nil . y))) 'y))
 
-(check 'get 'f (equiv? (get nil 'a) nil))
+(check 'get 'f (equiv? (get 'a nil) nil))
 
 (check 'get 'g (equiv? (get nil nil) nil))
 
@@ -718,13 +732,13 @@ nil
 
 ;; put
 
-(check 'put 'a (equal? (put nil 'a 'b) '((a . b))))
+(check 'put 'a (equal? (put 'a 'b nil) '((a . b))))
 
-(check 'put 'b (equal? (put '((a . b)) 'c 'd) '((c . d) (a . b))))
+(check 'put 'b (equal? (put 'c 'd '((a . b))) '((a . b) (c . d))))
 
-(check 'put 'c (equal? (put '((a . b)) 'a 'z) '((a . z))))
+(check 'put 'c (equal? (put 'a 'z '((a . b))) '((a . z))))
 
-(check 'put 'd (equal? (put '((c . d) (a . b)) 'a 'z) '((a . z) (c . d))))
+(check 'put 'd (equal? (put 'a 'z '((c . d) (a . b))) '((c . d) (a . z))))
 
 (newline)
 
@@ -757,3 +771,9 @@ nil
 (check 'shorter? 'g (not (shorter? '(nil nil) '(nil nil))))
 
 (newline)
+
+;;; Report
+
+(header 'test _ 'report)
+
+(println 'failed _ _ (ifnil report 'none))

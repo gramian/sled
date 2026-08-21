@@ -1,6 +1,6 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.3) Features
+## Version (0.4) Features
 
 * Scheme-like
 * LISP Interpreter
@@ -11,11 +11,11 @@
 * Lexical Scoping
 * Mark & Sweep Garbage Collector
 * Trampoline Evaluator
-* ~1000 Lines of Code (C89)
+* ~1K Lines of Code (C89)
 * 8 Special Forms
 * 21 Builtin Functions
 * 21 Function Standard Library
-* 12K Executable
+* 11K Executable
 * Open-Source (0BSD)
 
 ## Table of Contents
@@ -33,7 +33,7 @@
 SLED (**S**chemy **L**isp **e**n **D**OS) is a purely symbolic **LISP** (LISt
 Processor) with functionality (largely) inspired by **Scheme**. Originally
 derived from the fantastic [Kilo LISP](https://t3x.org/klisp), but reduced by
-some features such as macros, and enhanced with others. SLED can be classified
+some features (such as macros), and enhanced with others. SLED can be classified
 as an Ur-Lisp and runs on a **DOS** (Disk Operating System) such as
 [FreeDOS](https://freedos.org) or MS-DOS, as well as on DOS-emulators like
 [DOSBox](https://dosbox.com), [DOSBox-X](https://dosbox-x.com), or
@@ -42,7 +42,7 @@ For an overview of provided symbols, special forms, builtin functions, and
 standard library see the [index](#index).
 Get SLED:
 
-* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/download/v0.3/SLED-0_3.ZIP)
+* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/download/v0.4/SLED-0_4.ZIP)
 * [Source Code Repository](https://codeberg.org/gramian/sled)
 * [Backup Repository](https://github.com/gramian/sled)
 
@@ -50,8 +50,8 @@ Overall, SLED is a LISP for DOS.
 
 ## Data
 
-There are two fundamental data types: **Pairs** and **Atoms** (not pairs). Atoms
-come in three variants: **Symbols** and **Closures** (functions), and some
+There are two fundamental data types: **Pairs** and **Atoms** (not-pairs). Atoms
+come in three variants: **Symbols**, **Closures** (functions), and some
 special values.
 
 ### Symbols
@@ -96,12 +96,12 @@ For convenience the `'` short form syntax may be used:
 'sym
 ```
 
-Essentially quoting declares something as data and not code.
+Essentially quoting declares something as data instead of code.
 
 ### Pairs
 
-Pairs consist of a **head** and a **tail**, holding an `atom` or a `pair`. A
-pair can be created as data using the `.`:
+Pairs consist of a **head** and a **tail**, each holding either an `atom` or
+another `pair`. A pair can be created as data using the `.`:
 
 ```
 '(a . x)
@@ -134,7 +134,7 @@ A list can be created as data also by:
 '(a b)
 ```
 
-or as result of the `list` function:
+or as result of the (standard library) `list` function:
 
 ```
 (list 'a 'b)
@@ -156,7 +156,7 @@ An association list is a list where each element is a pair (association):
 ((a . x) (b . y) (c . z))
 ```
 
-The head part of such a pair is called key and the tail is called value.
+The head part of such a pair is called **key** and the tail is called **value**.
 
 ### S-Expressions
 
@@ -165,10 +165,10 @@ An S-expression is either an atom or a pair of S-expressions.
 In Lisp, Scheme, and in particular in SLED, S-expressions are used for data and
 source code.
 
-### von Neumann Ordinal Numbers
+### Numbers
 
-The SLED system does not feature numeric types. Yet natural numbers (positive
-integers) can be emulated using lists:
+The SLED system does not feature numeric types. Yet natural numbers
+(non-negative integers) can be emulated using lists:
 
 ```
 '()             ; zero
@@ -214,7 +214,7 @@ special form:
 ### Function Application
 
 The first element of an unquoted list is interpreted as an expression that
-evaluates to a function name and the remaining elements as arguments to that
+evaluates to a function and the remaining elements as arguments to that
 function:
 
 ```
@@ -244,6 +244,7 @@ LISPs rely on recursion instead of iteration. Recursion refers to a function
 calling itself. Two features of SLED help avoid a stack overflow in deep
 recursions: the trampoline evaluator and tail-call optimization (TCO). TCO
 works for `lambda`, `let`, `begin`, `if`, `ifnil`, and `apply`.
+Additionally, TCO works for `cons` if the recursion runs in the second argument.
 
 ### Errors
 
@@ -262,11 +263,6 @@ Beyond the core functions a set of typical functions is implemented as a
 standard library in the file `sled.scm`. For details see the [index](#index).
 The standard library may be extended with additional custom definitions.
 
-#### Custom Standard
-
-Custom functions a user wants to reuse with SLED can be appended to the standard
-library.
-
 ### Special Forms
 
 Certain forms appear like functions but are not. These so-called special forms
@@ -278,7 +274,8 @@ For details see the [index](#index).
 
 Special symbols, special forms, builtin functions, and standard library contents
 are immutable in SLED. Furthermore, special forms and builtin functions cannot
-be shadowed. This includes custom extensions to the standard library.
+be shadowed. Standard library and adjacent custom definitions cannot be
+redefined.
 
 ## System
 
@@ -316,26 +313,26 @@ but after the standard library loaded:
 C:\> sled code.scm
 ```
 
-The third is a "batch mode" switch `/b`, which exits after execution:
+The third is a "batch mode" switch `/B`, which exits after execution:
 
 ```cmd
-C:\> sled /b code.scm
+C:\> sled /B code.scm
 ```
 
-The fourth is an "ignore errors" switch `/i`, which behaves like `/b` but
-continues after an error occurs:
+The fourth is an "ignore errors" switch `/I`, which behaves like `/B` but
+continues execution after an error occurs:
 
 ```cmd
-C:\> sled /i code.scm
+C:\> sled /I code.scm
 ```
 
 The file path has to be the last argument.
 
 ### File Path
 
-If the path contains backslashes these need to be escaped, since the path
-becomes a symbol and the backslash `\` alone is not an admissible symbol
-character.
+In the interpreter, if the path contains backslashes these need to be escaped,
+since the path becomes a symbol and the backslash `\` alone is not an admissible
+symbol character.
 
 ```cmd
 C:\> sled to\my\code.scm
@@ -366,15 +363,16 @@ sled> (println 'hello\ world)
 #### Extended Characters
 
 A pitfall is extended (two-byte) characters which are not supported. An example
-is using the arrow keys in the REPL, resulting in an `α` (alpha). These extended
-characters pollute the input stream and can cause an error in an input line even
-if deleted. A new prompt via `CTRL+C` cleans the input stream.
+is using the arrow keys in the REPL, resulting in an `α` (alpha) in the standard
+input echo. These extended characters pollute the input stream and can cause an
+error in an input line even if deleted.
 
 ### Exiting
 
 There are two regular ways to exit `sled`.
 
-The first is the dollar symbol `$`, which tells the parser to exit:
+The first is the dollar symbol `$` on the top-level, which tells the parser to
+exit:
 
 ```
 sled> $
@@ -460,9 +458,9 @@ The standard library consumes about 5% of nodes and characters.
 
 |                                     |                                 |                                           |
 |-------------------------------------|---------------------------------|-------------------------------------------|
-| [`begin`](#begin-arg1-argn)         | [`comment`](#comment-arg1-argn) | [`define`](#define-sym-arg)               |
+| [`begin`](#begin-body1-bodyn)       | [`comment`](#comment-arg1-argn) | [`define`](#define-sym-arg)               |
 | [`if`](#if-arg1-arg2-arg3)          | [`ifnil`](#ifnil-arg1-arg2)     | [`lambda`](#lambda-arg1-argn-body1-bodyn) |
-| [`let`](#let-arg1-arg2-body1-bodyn) | [`quote`](#quote-sym)           |                                           |
+| [`let`](#let-arg1-arg2-body1-bodyn) | [`quote`](#quote-arg)           |                                           |
 
 **Builtin Functions**
 
@@ -488,12 +486,12 @@ The standard library consumes about 5% of nodes and characters.
 |                                     |                                 |                                  |
 |-------------------------------------|---------------------------------|----------------------------------|
 | [`and?`](#and-arg1-arg2)            | [`append`](#append-lst1-lst2)   | [`assert`](#assert-arg-sym)      |
-| [`compose`](#compose-arg-fun1-funn) | [`equal?`](#equal-arg1-arg2)    | [`dec`](#dec-arg)                |
-| [`error?`](#error)                  | [`get`](#get-lst-sym)           | [`id`](#id-arg)                  |
+| [`compose`](#compose-arg-fun1-funn) | [`dec`](#dec-arg)               | [`equal?`](#equal-arg1-arg2)     |
+| [`error?`](#error)                  | [`get`](#get-sym-lst)           | [`id`](#id-arg)                  |
 | [`inc`](#inc-arg)                   | [`list`](#list-arg1-argn)       | [`list?`](#list-arg)             |
 | [`map`](#map-fun-lst)               | [`member`](#member-arg-lst)     | [`or?`](#or-arg1-arg2)           |
 | [`pair?`](#pair-arg)                | [`printid`](#printid-arg1-arg2) | [`println`](#println-arg1-argn)  |
-| [`put`](#put-lst-sym-arg)           | [`reverse`](#reverse-lst)       | [`shorter?`](#shorter-lst1-lst2) |
+| [`put`](#put-sym-arg-lst)           | [`reverse`](#reverse-lst)       | [`shorter?`](#shorter-lst1-lst2) |
 
 ---
 
@@ -566,8 +564,6 @@ second argument list concatenated to the end of the first argument list.
 (append '(a) 'b)              ; → (a . b)
 ```
 
-> **NOTE:** This is a non-tail-call function.
-
 ---
 
 ### `apply <fun> <lst>`
@@ -604,7 +600,7 @@ This **builtin** unary predicate answers if the argument is an atom.
 
 ---
 
-### `begin <arg1> ... <argN>`
+### `begin <body1> ... <bodyN>`
 
 This **special form** evaluates its arguments in sequence and returns the last
 argument's return value.
@@ -624,7 +620,7 @@ This **standard alias** is for `newline`.
 
 ### `comment <arg1> ... <argN>`
 
-This **special form** is not evaluated by the parser. Use as block comment.
+This **special form** is not evaluated. Use as block comment.
 Unlike the other special forms, this is decoded by the parser before evaluation.
 
 ```
@@ -740,8 +736,6 @@ to `equiv?` for atoms.
 (equal? nil nil)                    ; → true
 ```
 
-> **NOTE:** This is a non-tail-call function.
-
 ---
 
 ### `equiv? <arg1> <arg2>`
@@ -783,7 +777,7 @@ This **standard library** thunk predicate answers if the previous evaluation
 resulted in an error.
 
 ```
-(define x) (error?)  ; → true
+(head nil) (error?)  ; → true
 ```
 
 ---
@@ -804,23 +798,25 @@ This **builtin** procedure triggers garbage collection. Node usage is printed if
 an argument is provided which is not `nil`.
 
 ```
-(gc)       ; →
-(gc nil)   ; →
+(gc)       ; → *no output*
+(gc nil)   ; → *no output*
 (gc true)  ; → (prints node usage)
 ```
 
 ---
 
-### `get <lst> <sym>`
+### `get <sym> <lst>`
 
-This **standard library** binary function returns the value paired to the second
-argument symbol if found in the first argument association list, or `nil`
+This **standard library** binary function returns the value paired to the first
+argument symbol if found in the second argument association list, or `nil`
 otherwise.
 
 ```
-(get '((a . x) (b . y)) 'a)  ; → x
-(get '((a . x) (b . y)) 'z)  ; → nil
+(get 'a '((a . x) (b . y)))  ; → x
+(get 'z '((a . x) (b . y)))  ; → nil
 ```
+
+> **NOTE:** Uses `equiv?` for comparisons.
 
 ---
 
@@ -851,20 +847,20 @@ function.
 
 This **special form** evaluates the first argument; if it does not evaluate to
 `nil`, the second argument is evaluated and returned, otherwise the third
-argument is evaluated and returned or nothing if no third argument is given.
+argument is evaluated and returned or `nil` if no third argument is given.
 
 ```
 (if 'ok 'con 'alt)  ; → con
 (if nil 'con 'alt)  ; → alt
 (if 'ok 'con)       ; → con
-(if nil 'con)       ; →
+(if nil 'con)       ; → nil
 ```
 
 ---
 
 ### `ifnil <arg1> <arg2>`
 
-This **special form** evaluates the first argument and returns its result,
+This **special form** evaluates the first argument and returns its result
 if it is not `nil`, otherwise the second argument is evaluated and returned.
 
 ```
@@ -961,8 +957,6 @@ return values.
 (map inc '(nil (nil)))  ; → ((nil) (nil nil))
 ```
 
-> **NOTE:** This is a non-tail-call function.
-
 ---
 
 ### `member <arg> <lst>`
@@ -974,6 +968,8 @@ argument list whose head is the first argument; otherwise `nil` is returned.
 (member 'b '(a b c))  ; → (b c)
 (member 'd '(a b c))  ; → nil
 ```
+
+> **NOTE:** Uses `equiv?` for comparisons.
 
 ---
 
@@ -989,7 +985,7 @@ This **builtin** thunk prints a line break; use for output formatting.
 
 ### `nil`
 
-This **special symbol** represents the empty list; and is also the only symbol
+This **special symbol** represents the empty list; and is also the only value
 evaluating to false. Equivalently, `'()` can be used for `nil`.
 
 ```
@@ -1092,8 +1088,8 @@ standard output and appends a line break.
 
 ### `proc? <arg>`
 
-This **builtin** unary predicate answers if its argument is the return value of
-a closure or builtin function. For special forms this predicate returns `nil`.
+This **builtin** unary predicate answers if its argument is a closure or builtin
+function. For special forms, this predicate returns `nil`.
 
 ```
 (proc? map)    ; → true
@@ -1104,19 +1100,19 @@ a closure or builtin function. For special forms this predicate returns `nil`.
 
 ---
 
-### `put <lst> <sym> <arg>`
+### `put <sym> <arg> <lst>`
 
-This **standard library** function returns an updated first argument association
-list by setting the tail of the pair with the second argument symbol as head, or
-adding a pair with the second argument symbol as head and the third argument as
-tail, if no pair with the second argument symbol as head is listed in the first
+This **standard library** function returns an updated third argument association
+list by setting the tail of the pair with the first argument symbol as head, or
+adding a pair with the first argument symbol as head and the second argument as
+tail, if no pair with the first argument symbol as head is listed in the third
 argument.
 
 ```
-(put nil 'hello 'world)               ; → ((hello . world))
-(put '((one . 1)) 'one 'uno)          ; → ((one . uno))
-(put '((one . 1)) 'two '2)            ; → ((two . 2) (one . 1))
-(put '((two . 2) (one . 1)) 'one 'I)  ; → ((one . I) (two . 2))
+(put 'hello 'world nil)               ; → ((hello . world))
+(put 'one 'uno '((one . a)))          ; → ((one . uno))
+(put 'two 'b '((one . a)))            ; → ((one . a) (two . b))
+(put 'two 'z '((one . a) (two . b)))  ; → ((one . a) (two . z))
 ```
 
 ---
@@ -1127,7 +1123,7 @@ This **standard alias** is for `exit`.
 
 ---
 
-### `quote <sym>`
+### `quote <arg>`
 
 This **special form** returns its argument unevaluated.
 
@@ -1140,8 +1136,8 @@ This **special form** returns its argument unevaluated.
 
 ### `read`
 
-This **builtin** thunk reads a line of input from the standard input source
-terminated by a line break via return key / enter key.
+This **builtin** thunk returns a symbol read as a line of input from the
+standard input source terminated by a line break via return key / enter key.
 
 ```
 (read)
@@ -1151,8 +1147,8 @@ terminated by a line break via return key / enter key.
 
 ### `restart [<sym>]`
 
-This **builtin** function restarts the interpreter and optionally loads a file
-specified by the symbol argument.
+This **builtin** function resets and restarts the interpreter and optionally
+loads a file specified by the symbol argument. All definitions are lost!
 
 ```
 (restart 'next.scm)
@@ -1230,9 +1226,10 @@ true  ; → true
 ### `value <sym>`
 
 This **builtin** unary function resolves the value of its symbol argument.
+Respects lexical scope.
 
 ```
-(value 'ver)  ; → sled-0.3
+(value 'ver)  ; → sled-0.4
 ```
 
 ---
@@ -1242,7 +1239,7 @@ This **builtin** unary function resolves the value of its symbol argument.
 This **special symbol** evaluates to a symbol pinpointing the version of SLED.
 
 ```
-ver  ; → sled-0.3
+ver  ; → sled-0.4
 ```
 
 ---
@@ -1260,11 +1257,11 @@ This is a **standard alias** for `empty?`; use for testing von Neumann ordinals.
 
 * SLED is made for a disk operating system like **FreeDOS** or **MS-DOS**
 * Outside DOS, a DOS emulator like **DOSBox**, **DOSBox-X**, **DOSBox-Staging** is required
-* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, or MacOS
+* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, MacOS, or Unix.
 * Building SLED requires [Microsoft C Compiler](https://github.com/davidly/dos_compilers) or [Open Watcom](https://github.com/open-watcom/open-watcom-v2), as well as `make`
 * Build with MS C 6.0A: `make build_msc` (Compiler location via `MSC`)
 * Build with Open Watcom V2: `make build_owc` (Compiler location via `OWC`)
-* Run build `make run`
+* Run build: `make run`
 * Run tests: `make tests`
 * Run benchmark: `make bench` (Takeuchi function, see [this](https://archive.org/details/AcornUser047-Jun86/page/n179/mode/2up) and [that](https://archive.org/details/AcornUser052-Nov86/page/n197/mode/2up))
 

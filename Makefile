@@ -25,7 +25,7 @@ build_msc:
 		-c "set PATH=C:\BIN;C:\BINB" \
 		-c "set INCLUDE=C:\INCLUDE" \
 		-c "set LIB=C:\LIB" \
-		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 $(SRC) /link /STACK:8192 > BUILD.LOG" \
+		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 $(SRC) /link /NOE /STACK:8192 > BUILD.LOG" \
 		-c "exit"
 	cat BUILD.LOG
 	ls -lS $(OUT)
@@ -42,14 +42,14 @@ build_owc:
 
 tests:
 	$(call dosbox,25000) \
-		-c "$(OUT) /i tests.scm > TESTS.LOG" \
+		-c "$(OUT) /I tests.scm > TESTS.LOG" \
 		-c "exit"
 	cat TESTS.LOG
 
 bench:
 	$(call dosbox,25000) \
 		-c "time > BENCH.LOG" \
-		-c "$(OUT) /b bench.scm >> BENCH.LOG" \
+		-c "$(OUT) /B bench.scm >> BENCH.LOG" \
 		-c "time >> BENCH.LOG" \
 		-c "exit"
 	cat BENCH.LOG

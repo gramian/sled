@@ -1,5 +1,5 @@
 #define NAME "sled"
-#define VERSION "0.3"
+#define VERSION "0.4"
 #define TITLE "SLED - Schemy LISP en DOS (" VERSION ")"
 
 #if !defined(__SMALL__) && !defined(M_I86SM) && !defined(_M_I86SM)
@@ -8,14 +8,16 @@
 
 // Typedefs ####################################################################
 
+typedef unsigned char byte;
 typedef int bool;
 typedef unsigned int node;
 
 // Configuration ###############################################################
 
-#define NONE       ((void*)0)    // Null Pointer
+#define NONE       0             // Null Pointer
 #define TRUE       1
 #define FALSE      0
+
 #define DOS_EOF    0x1A
 #define DOS_EOL    "\r\n"
 
@@ -23,21 +25,21 @@ typedef unsigned int node;
 #define STDLIB     NAME ".scm"
 #define BAR_WIDTH  20
 
-#define NNODES     (12288 + 80)  // Number of nodes
-#define SYMTAB     (2048 + 240)  // Maximum total symbol characters
+#define NNODES     (12288 + 72)  // Number of nodes
+#define SYMTAB     (2048 + 220)  // Symbol table size
 #define SYMLEN     16            // Maximum symbol length
-#define BUFLEN     120           // Input buffer sizes
-#define PRDEPTH    128           // Maximum print and parse recursion depth
-#define NMODES     1024          // Maximum mode stack entries
+#define BUFLEN     120           // Input buffer size
+#define PRDEPTH    64            // Maximum print and parse recursion depth
+#define NMODES     512           // Maximum mode stack entries
 #define NLOAD      2             // Maximum nested loads
 
 // Enumerations ################################################################
 
 enum { SPCL = NNODES, UNDEF, RPAREN, DOT, EOT, ERR, NIL };  // Sentinels (live above the node heap)
 
-enum { MHALT = 0, MEXPR, MLIST, MCALL, MRETN, MPRED, MOR, MSET, MBEGIN, MLET };  // Trampoline Modes
+enum { MHALT = 0, MCHAIN, MRETN, MOR, MPRED, MEXPR, MLIST, MCALL, MLET, MBEGIN, MSET, MCONS };  // Trampoline Modes
 
-enum { S_BEGIN = 0 , S_DEFINE, S_IF, S_IFNIL, S_LAMBDA, S_LET, S_QUOTE,  // Special Forms
+enum { S_BEGIN = 0, S_DEFINE, S_IF, S_IFNIL, S_LAMBDA, S_LET, S_QUOTE,  // Special Forms
        NSPECIAL };
 
 enum { F_APPLY = NSPECIAL, F_ATOM, F_CONS, F_DEFINED, F_EMPTY, F_ENV, F_EOF,  // Builtin Functions
@@ -56,16 +58,13 @@ node Freelist;
 
 // Registers (GC Roots)
 node Acc = NIL;      // Current expression
-node Env = NIL;      // Lexical environment (association list)
+node Env = NIL;      // Lexical environments (association list)
 node Vstack = NIL;   // Value stack
 node Tmpcar = NIL;   // Scratch cons cell head
 node Tmpcdr = NIL;   // Scratch cons cell tail
 node Symbols = NIL;  // Symbol table
 node StdDef = NIL;   // Standard library symbols
 node UserDef = NIL;  // User defined symbols
-
-node Restartsym = UNDEF;    // UNDEF: none, NIL: bare restart, else file symbol
-char Restartbuf[SYMLEN+1];
 
 // Mode Stack
 unsigned int Mstack = 0;
@@ -76,6 +75,8 @@ unsigned int Symtop = 0;
 unsigned int Pooltop = 0;
 char Symtab[SYMTAB];
 
+char Restartbuf[SYMLEN+1];
+
 // Reader
 struct { int fd, pos, len; char buf[BUFLEN]; int next; } IOstate[1 + NLOAD];
 int IOdepth;
@@ -83,14 +84,20 @@ int IOdepth;
 
 // Control
 int Parens;                 // counter for open parenthesis
-int Rdlines;                // state of the input reader used by (read)
-volatile bool Interrupted;  // set by on_break() Ctrl+C handler and by rdch() if error
-bool Quit;                  // flag signaling that an (exit) was evaluated
-bool Fixed;                 // flag that once true new defines register in UserDef
+volatile bool Interrupted;  // set by on_break() Ctrl+C handler and by read_char() if error
+bool Quit;                  // flag signaling that an "exit" was evaluated
+bool Restart;               // flag signaling that a "restart" was evaluated
+bool Fixed;                 // flag signaling end of StdDef and start of UserDef
 bool Skip;                  // flag signaling an open block comment
 
 // Symbols
 node S_ans, S_self, S_ver;
+
+// Most common error messages
+static const char Badpair[] = "bad pair";
+static const char Syntax[] = "syntax";
+static const char Type[] = "type";
+static const char Undefined[] = "undefined";
 
 // Bitmasks ####################################################################
 
@@ -115,38 +122,53 @@ const char* _fastcall strend(const char* s) /*pure*/ {
 
 // Test if two strings are equal
 bool _fastcall streq(const char *s, const char* t) /*pure*/ {
-    while (*s && *s == *t) { s++; t++; }
+    while (*s && (*s == *t)) { s++; t++; }
     return *s == *t;
+}
+
+// Copy string (return destination terminator position)
+char* _fastcall strcp(char* s, const char* t) {
+    while ((*s = *t) !=0) { s++; t++; }
+    return s;
 }
 
 // System I/O ##################################################################
 
+void _cdecl _setenvp(void) { }  // Prevent environment copying on start
+
 // Call DOS interrupt 21h (small memory model only)
 int int21h(unsigned int a, unsigned int b, unsigned int c, const char* d) {
-    int r;
+    int r = -1;
     _asm {
         mov ax, a  // function:subfunction codes
         mov bx, b  // usually a handle
         mov cx, c  // usually a length
         mov dx, d  // usually a pointer
         int 21h
-        jnc ok
-        mov ax, -1
-        ok:
+        jc fail
         mov r, ax
+        fail:
     }
     return r;
 }
 
-// Print string to standard output
-void sys_print(const char* msg) {
-    if (*msg) int21h(0x4000, 1, strend(msg) - msg, msg);
+// Print to standard output
+void sys_write(const char* s, unsigned int n) {
+    if (n) int21h(0x4000, 1, n, s);
 }
 
-// Print newline to standard output
-void sys_newline() {
-    int21h(0x4000, 1, sizeof(DOS_EOL) - 1, DOS_EOL);
+// Print newline
+void sys_newline(void) {
+    sys_write(DOS_EOL, sizeof(DOS_EOL) - 1);
 }
+
+// Print string
+void sys_print(const char* msg) {
+    sys_write(msg, strend(msg) - msg);
+}
+
+// Print literal
+#define sys_stamp(lit) sys_write(lit, sizeof("" lit) - 1)
 
 // Exit program with error status
 #define sys_abort() int21h(0x4C01, 0, 0, NONE)
@@ -183,7 +205,7 @@ void sys_break(void (_interrupt _far *hdl)(void)) {
             pop ds
         }
     } else {
-        _asm {  // restore old int 1Bh handler
+        _asm {  // restore old int 1Bh handler (23h is restored by DOS)
             push ds
             mov ax, 251Bh
             lds dx, DWORD PTR old1b
@@ -195,19 +217,20 @@ void sys_break(void (_interrupt _far *hdl)(void)) {
 
 // Accessors ###################################################################
 
-#define car(x)         (Heap[x].car & PTR_MASK)
-#define cdr(x)         (Heap[x].cdr)
+#define car(x)        (Heap[(x)].car & PTR_MASK)
+#define cdr(x)        (Heap[(x)].cdr)
 
-#define caar(x)        car(car(x))
-#define cadr(x)        car(cdr(x))       // second
-#define cdar(x)        cdr(car(x))
-#define cddr(x)        cdr(cdr(x))
+#define caar(x)       car(car(x))
+#define cadr(x)       car(cdr(x))       // second
+#define cdar(x)       cdr(car(x))
+#define cddr(x)       cdr(cdr(x))
 
-#define cadar(x)       car(cdr(car(x)))
-#define caddr(x)       car(cdr(cdr(x)))  // third
+#define caddr(x)      car(cdr(cdr(x)))  // third
 
-#define set_car(x, v)  (Heap[x].car = (v))
-#define set_cdr(x, v)  (Heap[x].cdr = (v))
+#define set_car(x, v) (Heap[(x)].car = (v))
+#define set_cdr(x, v) (Heap[(x)].cdr = (v))
+
+#define symstr(n)     (Symtab + car(n))  // Convert symbol to string
 
 // Predicates ##################################################################
 
@@ -235,34 +258,31 @@ bool _fastcall isClosure(node n) /*pure*/ {
 
 // Printing ####################################################################
 
-// Convert symbol to string
-#define symstr(n) (Symtab + car(n))
-
 // Print node semi-recursively
 void print_node(node n, int d) {
     if (Interrupted) return;
-    if (n == NIL)          sys_print("nil");
-    else if (n == EOT)     sys_print("*eot*");
-    else if (n == UNDEF)   sys_print("*undef*");
+    if (n == NIL)          sys_stamp("nil");
+    else if (n == EOT)     sys_stamp("*eot*");
+    else if (n == UNDEF)   sys_stamp("*undef*");
     else if (isSymbol(n))  sys_print(symstr(n));
-    else if (isClosure(n)) sys_print("*closure*");
-    else if (isAtom(n))    sys_print("*unprintable*");
-    else if (d < 0)        sys_print("*list*");
-    else if (d >= PRDEPTH) sys_print("...");
+    else if (isClosure(n)) sys_stamp("*closure*");
+    else if (isAtom(n))    sys_stamp("*atom*");
+    else if (d < 0)        sys_stamp("*list*");
+    else if (d >= PRDEPTH) sys_stamp("...");
     else {
-        sys_print("(");
+        sys_stamp("(");
         for (;;) {
             print_node(car(n), d+1);
             n = cdr(n);
             if (n == NIL) break;
             if (isAtom(n)) {
-                sys_print(" . ");
+                sys_stamp(" . ");
                 print_node(n, d+1);
                 break;
             }
-            sys_print(" ");
+            sys_stamp(" ");
         }
-        sys_print(")");
+        sys_stamp(")");
     }
 }
 
@@ -271,16 +291,30 @@ void print_env(void) {
     node u;
     for (u = UserDef; u != NIL; u = cdr(u)) {
         sys_print(symstr(car(u)));
-        sys_print("\t");
+        sys_stamp("\t");
         print_node(cdar(u), -1);
         sys_newline();
     }
+}
+
+// Print fixed symbols
+node print_help(void) {
+    node u;
+    sys_stamp("special forms:" DOS_EOL);
+    for (u = 0; u < NSPECIAL; u++) { sys_stamp(" "); sys_print(symstr(u)); }
+    sys_stamp(DOS_EOL "builtin functions:" DOS_EOL);
+    for (u = NSPECIAL; u < NBUILTIN; u++) { sys_stamp(" "); sys_print(symstr(u)); }
+    sys_stamp(DOS_EOL "standard library:" DOS_EOL);
+    for (u = StdDef; u != NIL; u = cdr(u)) { sys_stamp(" "); sys_print(symstr(car(u))); }
+    sys_newline();
+    return UNDEF;
 }
 
 // Print memory usage
 void print_usage(unsigned int used) {
     char buf[BAR_WIDTH + 3];
     unsigned int i, filled = used / (NNODES / BAR_WIDTH);
+    if (filled > BAR_WIDTH) filled = BAR_WIDTH;
 
     buf[0] = '[';
     for (i = 1; i <= BAR_WIDTH; i++) buf[i] = (i <= filled) ? '#' : '.';
@@ -295,7 +329,7 @@ void print_usage(unsigned int used) {
 
 // Handle unrecoverable error
 void fatal(const char* m) {
-    sys_print("! fatal: ");
+    sys_stamp("! fatal: ");
     sys_print(m);
     sys_newline();
     sys_break(NONE);
@@ -304,10 +338,10 @@ void fatal(const char* m) {
 
 // Handle recoverable error
 node error(const char *m, node n) {
-    sys_print("? ");
+    sys_stamp("? ");
     sys_print(m);
-    if (n != UNDEF) {
-        sys_print(": ");
+    if ((n != UNDEF) && !Interrupted) {
+        sys_stamp(": ");
         print_node(n, 0);
     }
     sys_newline();
@@ -320,25 +354,23 @@ node error(const char *m, node n) {
 // Breaking guard macro
 #define BREAK_IF(cc, dd, mm, nn) if (cc) { dd = error(mm, nn); break; }
 
-// Syntax error wrapper
-node syntax(node n) {
-    return error("syntax", n);
-}
-
 // Test if number of arguments is wrong
 bool _fastcall badarity(node x, int k0, int kn) /*pure*/ {
     int i;
     if (kn == -1) kn = NNODES;
-    for (i = 0; !isAtom(x); x = cdr(x), i++)
+    for (x = cdr(x), i = 0; !isAtom(x); x = cdr(x), i++)
         if (i >= kn) return TRUE;
     return (x != NIL) || (i < k0);
 }
+
+// Syntax error wrapper
+#define syntax(xx) error(Syntax, xx)
 
 // Syntax guard macro
 #define SYNTAX_IF(xx, mm, nn) do { if (badarity(xx, mm, nn)) return syntax(xx); } while(0)
 
 // Test if lambda is malformed (and "self" is not used as a parameter name)
-bool malformed(node p) /*pure*/ {
+bool _fastcall malformed(node p) /*pure*/ {
     node q;
     for (p = cadr(p); !isAtom(p); p = cdr(p)) {
         q = car(p);
@@ -354,7 +386,7 @@ void mark(node n) {
     register node p = NIL, t;
     unsigned int w;
     for (;; n = t) {
-        if ((n < NRESERVED) || (n >= SPCL) || ((w = Heap[n].cdr) & MARK_TAG)) {
+        if ((n < NRESERVED) || (n >= SPCL) || ((w = Heap[n].cdr) & MARK_TAG)) {  // reserved cdrs self-evaluate
             if (p == NIL) break;
             w = Heap[p].cdr;
             if (w & SWAP_TAG) {                  // done with car, trace cdr now
@@ -426,7 +458,11 @@ node _fastcall cons_tag(node a, node d, node t) {
 
 // Push on to mode stack
 void _fastcall mpush(char m) {
-    if (Mstack >= NMODES - 1) fatal("mstack full");
+    if (Mstack >= NMODES - 1) {
+        error("mstack full", UNDEF);
+        Interrupted = TRUE;
+        return;
+    }
     Modes[++Mstack] = m;
 }
 
@@ -455,9 +491,11 @@ node vpop(void) {
 // Find symbol in symbol table
 node find_sym(const char *s) /*pure*/ {
     node p, sym;
+    const char *t;
     for (p = Symbols; p != NIL; p = cdr(p)) {
         sym = car(p);
-        if (streq(s, symstr(sym))) return sym;
+        t = symstr(sym);
+        if ((*t == *s) && streq(s, t)) return sym;
     }
     return NIL;
 }
@@ -471,7 +509,7 @@ node add_sym(const char *s, node v) {
     if (n != NIL) return n;
 
     ERROR_IF((Symtop + SYMLEN + 1) > SYMTAB, "symbols full", UNDEF);
-    while (Symtab[Symtop++] = *s++) ;  // string copy
+    while ((Symtab[Symtop++] = *s++) != 0) ;  // string copy
 
     if (v == SPCL) {  // take a reserved node (no GC)
         n = Pooltop++;
@@ -495,8 +533,7 @@ int read_char(void) {
         return c;
     }
     if (IO.pos >= IO.len) {
-        if ((IOdepth == 0) && (Parens == 0) && (Rdlines == 0))
-            sys_print(PROMPT);  // print prompt if at top-level
+        if ((IOdepth == 0) && (Parens == 0)) sys_stamp(PROMPT);  // print prompt if at top-level
         IO.len = sys_read(IO.fd, BUFLEN, IO.buf);
         if (Interrupted) return EOT;
         if (IO.len <= 0) {
@@ -505,10 +542,10 @@ int read_char(void) {
         }
         IO.pos = 0;
     }
-    c = (unsigned char) IO.buf[IO.pos++];
+    c = (byte) IO.buf[IO.pos++];
     if (c == DOS_EOF) return EOT;
-    if ((IOdepth == 0) && ((c == 0x00) || (c == 0xE0))) {  // extended key
-        error("extended char", UNDEF);
+    if ((IOdepth == 0) && ((c == 0x00) || (c == 0xE0))) {  // extended char
+        error("stray key", UNDEF);
         Interrupted = TRUE;
         return EOT;
     }
@@ -517,23 +554,44 @@ int read_char(void) {
 
 // Read symbol
 node read_sym(int c) {
-    char s[SYMLEN+1];
+    char sym[SYMLEN+1];
     unsigned int i = 0;
-    bool over = FALSE;
+    bool over = FALSE, bad = FALSE;
     while (isSymbolic(c, i)) {
         if ('\\' == c) {
             c = read_char();
-            ERROR_IF((c == EOT) || (c == '$') || (c == '(') || (c == ')') ||
-                     (c == '\''), "bad escape", UNDEF);
+            if (c == EOT) { bad = TRUE; break; }
+            bad = bad || (c == 0) || (c == '$') || (c == '(') || (c == ')') || (c == '\'');
         } else if (c >= 'A' && c <= 'Z') c += 32;
-        if (i < SYMLEN) s[i++] = c; else over = TRUE;
+        if (i < SYMLEN) sym[i++] = c; else over = TRUE;
         c = read_char();
     }
-    s[i] = 0;
+    sym[i] = 0;
     IO.next = c;
     if (Interrupted) return ERR;
     ERROR_IF(over, "overlong symbol", UNDEF);
-    return (streq(s, "nil")) ? NIL : add_sym(s, UNDEF);  // add_sym checks if the symbol exists and if so returns its index
+    ERROR_IF(bad, "bad escape", UNDEF);
+    return (streq(sym, "nil")) ? NIL : add_sym(sym, UNDEF);  // add_sym checks if the symbol exists and if so returns its index
+}
+
+// Read symbol from line of standard input
+node read_input(void) {
+    char sym[SYMLEN+1];
+    unsigned int i = 0;
+    int save = IOdepth, c;
+    IOdepth = 0; IO.next = EOT;
+    if ((IO.pos < IO.len) && (IO.buf[IO.pos] == '\r')) IO.pos++;
+    if ((IO.pos < IO.len) && (IO.buf[IO.pos] == '\n')) IO.pos++;
+    Parens++;  // suppress the prompt
+    while (((c = read_char()) != EOT) && (c != '\n')) {
+        if ((c >= 'A') && (c <= 'Z')) c += 32;
+        if ((c != '\r') && (i < SYMLEN)) sym[i++] = c;
+    }
+    Parens--;
+    IOdepth = save;
+    sym[i] = 0;
+    if (Interrupted) return ERR;
+    return i ? add_sym(sym, UNDEF) : EOT;
 }
 
 // Skip whitespace, comments, or block comments
@@ -541,15 +599,11 @@ int parse_skip(void) {
     int c;
     for (;;) {
         c = read_char();
+        if (c == ';')
+            while ((c != '\n') && (c != EOT)) c = read_char();
         if (Skip) {
             if (c == EOT || c == '(' || c == ')') return c;
             continue;
-        }
-        if (c == ';')
-            while ((c != '\n') && (c != EOT)) c = read_char();
-        if ((Parens == 0) && (c == '\n') && (Rdlines > 0)) {
-            Rdlines--;
-            if (Rdlines == 0) return EOT;
         }
         if ((c != ' ') && (c != '\t') && (c != '\n') && (c != '\r')) return c;
     }
@@ -572,22 +626,24 @@ node parse_list(void) {
         if (Skip) continue;
         if ((NIL == t) && (n == K_COMMENT)) { Skip = TRUE; continue; }
         if (DOT == n) {
-            BREAK_IF(t == NIL, n, "bad pair", UNDEF);
+            BREAK_IF(t == NIL, n, Badpair, UNDEF);
             n = parse(); if (ERR == n) break;
             BREAK_IF((n == DOT) || (n == RPAREN) ||
-                     (n == EOT) || (n == UNDEF), n, "bad pair", UNDEF);
+                     (n == EOT) || (n == UNDEF), n, Badpair, UNDEF);
             set_cdr(t, n);
             n = parse(); if (ERR == n) break;
-            BREAK_IF(n != RPAREN, n, "bad pair", UNDEF);
+            BREAK_IF(n != RPAREN, n, Badpair, UNDEF);
             break;
         }
         c = cons(n, NIL);
         if (NIL == t) set_car(Vstack, c); else set_cdr(t, c);
         t = c;
     }
-    if (entered) n = NIL;
-    else if (Skip) n = UNDEF;
-    else n = car(Vstack);
+    if (ERR != n) {
+        if (entered) n = NIL;
+        else if (Skip) n = UNDEF;
+        else n = car(Vstack);
+    }
     Skip = entered;
     Parens--;
     vpop();
@@ -624,22 +680,24 @@ node parse(void) {
 // Virtual Machine #############################################################
 
 // Symbol layout:      (SYMB_TAG | SymTab-offset . value)
-// Environment layout: (symbol ...)
 // Closure layout:     (CLOS_TAG | params-index . (environment . (body ...)))
+// Environment layout: ((symbol . value) ...)
 
 // Set answer
 #define set_ans(d) (set_cdr(S_ans, d))
 
 node load(const char *s, bool ie);  // forward: load -> eval -> builtin -> load
 
-// Resolve symbol in current scope
+// Browse environment
 node _fastcall lookup(node n) /*pure*/ {
-    register node e, a;
-    if (n >= NRESERVED)
-        for (e = Env; e != NIL; e = cdr(e))
-            for (a = car(e); a != NIL; a = cdr(a))
-                if (caar(a) == n) return cdar(a);
-    return cdr(n);  // The symbol's value is its own cdr
+    register node e, b;
+    if (n >= NRESERVED) {
+        for (e = Env; e != NIL; e = cdr(e)) {
+            b = car(e);
+            if (car(b) == n) return cdr(b);
+        }
+    }
+    return cdr(n);
 }
 
 // Built-in functions
@@ -650,83 +708,80 @@ node builtin(node x) {
 
     switch(fn) {
         case F_HEAD:       // (head lst)
-            SYNTAX_IF(x, 2, 2);
-            ERROR_IF(isAtom(ad), "type", x);
+            SYNTAX_IF(x, 1, 1);
+            ERROR_IF(isAtom(ad), Type, x);
             return car(ad);
         case F_TAIL:       // (tail lst)
-            SYNTAX_IF(x, 2, 2);
-            ERROR_IF(isAtom(ad), "type", x);
+            SYNTAX_IF(x, 1, 1);
+            ERROR_IF(isAtom(ad), Type, x);
             return cdr(ad);
         case F_CONS:       // (cons any any)
-            SYNTAX_IF(x, 3, 3);
+            SYNTAX_IF(x, 2, 2);
             return cons(ad, caddr(x));
         case F_VALUE:      // (value sym)
-            SYNTAX_IF(x, 2, 2);
-            ERROR_IF(!isSymbol(ad), "type", x);
+            SYNTAX_IF(x, 1, 1);
+            ERROR_IF(!isSymbol(ad), Type, x);
             n = lookup(ad);
-            ERROR_IF(UNDEF == n, "undefined", ad);
+            ERROR_IF(UNDEF == n, Undefined, ad);
             return n;
         case F_EMPTY:      // (empty? lst)
-            SYNTAX_IF(x, 2, 2);
+            SYNTAX_IF(x, 1, 1);
             return (ad == NIL) ? K_TRUE : NIL;
         case F_EQUIV:      // (equiv? any any)
-            SYNTAX_IF(x, 3, 3);
+            SYNTAX_IF(x, 2, 2);
             return (ad == caddr(x)) ? K_TRUE : NIL;
         case F_ATOM:       // (atom? any)
-            SYNTAX_IF(x, 2, 2);
+            SYNTAX_IF(x, 1, 1);
             return isAtom(ad) ? K_TRUE : NIL;
         case F_SYMBOL:     // (symbol? any)
-            SYNTAX_IF(x, 2, 2);
+            SYNTAX_IF(x, 1, 1);
             return isSymbol(ad) ? K_TRUE : NIL;
         case F_PROC:       // (proc? any)
-            SYNTAX_IF(x, 2, 2);
+            SYNTAX_IF(x, 1, 1);
             return (isClosure(ad) || ((ad >= NSPECIAL) && (ad < NBUILTIN))) ? K_TRUE : NIL;
         case F_DEFINED:    // (defined? sym)
-            SYNTAX_IF(x, 2, 2);
-            ERROR_IF(!isSymbol(ad), "type", x);
+            SYNTAX_IF(x, 1, 1);
+            ERROR_IF(!isSymbol(ad), Type, x);
             return (UNDEF != cdr(ad)) ? K_TRUE : NIL;
         case F_EOF:        // (eof? any)
-            SYNTAX_IF(x, 2, 2);
+            SYNTAX_IF(x, 1, 1);
             return (EOT == ad) ? K_TRUE : NIL;
         case F_PRINT:      // (print . any)
-            SYNTAX_IF(x, 1, -1);
+            SYNTAX_IF(x, 0, -1);
             for (n = cdr(x); n != NIL; n = cdr(n)) print_node(car(n), 0);
             return UNDEF;
         case F_NEWLINE:    // (newline)
-            SYNTAX_IF(x, 1, 1);
+            SYNTAX_IF(x, 0, 0);
             sys_newline();
             return UNDEF;
-        case F_LOAD:       // (load sym)
-            SYNTAX_IF(x, 2, 3);
-            ERROR_IF(!isSymbol(ad), "type", x);
+        case F_LOAD:       // (load sym [any])
+            SYNTAX_IF(x, 1, 2);
+            ERROR_IF(!isSymbol(ad), Type, x);
             return load(symstr(ad), (cddr(x) != NIL) && (caddr(x) != NIL));
         case F_READ:       // (read)
-            SYNTAX_IF(x, 1, 1);
-            Rdlines = 2;
-            do { x = parse(); } while (UNDEF == x);
-            Rdlines = 0;
-            return x;
+            SYNTAX_IF(x, 0, 0);
+            return read_input();
         case F_ERROR:      // (error sym [any])
-            SYNTAX_IF(x, 2, 3);
-            ERROR_IF(!isSymbol(ad), "type", x);
+            SYNTAX_IF(x, 1, 2);
+            ERROR_IF(!isSymbol(ad), Type, x);
             return error(symstr(ad), cddr(x) == NIL ? UNDEF : caddr(x));
         case F_ENV:        // (env)
-            SYNTAX_IF(x, 1, 1);
+            SYNTAX_IF(x, 0, 0);
             print_env();
             return UNDEF;
         case F_GC:         // (gc [any])
-            SYNTAX_IF(x, 1, 2);
+            SYNTAX_IF(x, 0, 1);
             u = gc();
             if (ad != NIL) print_usage(NNODES - u);
             return UNDEF;
         case F_RESTART:    // (restart [sym])
-            SYNTAX_IF(x, 1, 2);
-            ERROR_IF((ad != NIL) && !isSymbol(ad), "type", x);
-            Restartsym = ad;
-            Quit = TRUE;
+            SYNTAX_IF(x, 0, 1);
+            ERROR_IF((ad != NIL) && !isSymbol(ad), Type, x);
+            if (ad != NIL) strcp(Restartbuf, symstr(ad)); else Restartbuf[0] = 0;
+            Restart = Quit = TRUE;
             return UNDEF;
         case F_EXIT:       // (exit)
-            SYNTAX_IF(x, 1, 1);
+            SYNTAX_IF(x, 0, 0);
             Quit = TRUE;
             return UNDEF;
         default:
@@ -736,99 +791,86 @@ node builtin(node x) {
 
 // Bind values as arguments
 node bindargs(node v, node a) {
-    node e = NIL, n;
-    vpush(e);
+    node n;
     for (; !isAtom(v); a = cdr(a), v = cdr(v)) {
-        ERROR_IF(isAtom(a), "missing args", (vpop(), Acc));
+        ERROR_IF(isAtom(a), "missing args", Acc);
         n = cons(car(v), car(a));
-        e = cons(n, e);
-        set_car(Vstack, e);
+        Env = cons(n, Env);
     }
-    if (isSymbol(v)) {
+    if (v != NIL) {
         n = cons(v, a);
-        e = cons(n, e);
-    } else ERROR_IF(NIL != a, "extra args", (vpop(), Acc));
-    Env = cons(e, Env);
-    vpop();
+        Env = cons(n, Env);
+    } else ERROR_IF(NIL != a, "extra args", Acc);
     return NIL;
 }
 
+// Check tail position
+#define isTail() (Modes[Mstack] <= MRETN)
+
 // Apply function (with tail-call optimization)
-node funapp(node x) {
-    node c = car(x), b;
-    bool tc;
-    ERROR_IF(!isClosure(c), "not a function", x);
-
-    tc = Modes[Mstack] == MRETN;
-
-    if (!tc) { vpush(Env); mpush(MRETN); }
-    Env = cadr(c);
-    if (ERR == bindargs(car(c), cdr(x))) {
-        if (!tc) { Env = vpop(); mpop(); }
-        return ERR;
-    }
-    b = cddr(c);
-    if (NIL == cdr(b)) { mpush(MEXPR); return car(b); }
-    vpush(b);
-    mpush(MBEGIN);
-    return NIL;
+node funapp(node c, node a) {
+    node b = cdr(c);
+    if (!isTail()) { vpush(Env); mpush(MRETN); }
+    Env = car(b);
+    if (ERR == bindargs(car(c), a)) return ERR;
+    b = cdr(b);
+    if (NIL != cdr(b)) { vpush(cdr(b)); mpush(MBEGIN); }
+    return car(b);
 }
 
 // Special forms
 node special(node x) {
-    node n, fn = car(x), ad = cdr(x);
-    ad = isAtom(ad) ? NIL : car(ad);
+    node hd = car(x), tl = cdr(x), ad = isAtom(tl) ? NIL : car(tl);
 
-    switch(fn) {
-        case S_QUOTE:   // (quote any)
-            SYNTAX_IF(x, 2, 2);
-            return ad;
+    switch(hd) {
         case S_IF:      // (if any any [any])
-            SYNTAX_IF(x, 3, 4);
+            SYNTAX_IF(x, 2, 3);
             mpush(MPRED);
-            vpush(cddr(x));  // (then, else)
-            mpush(MEXPR);
+            vpush(cdr(tl));  // (then, else)
             return ad;       // predicate
         case S_BEGIN:   // (begin . any)
-            SYNTAX_IF(x, 1, -1);
-            if (NIL == cdr(x)) return NIL;
-            if (NIL != cddr(x)) { mpush(MBEGIN); vpush(cddr(x)); }
-            mpush(MEXPR);
+            SYNTAX_IF(x, 0, -1);
+            if (tl == NIL) return NIL;
+            tl = cdr(tl);
+            if (tl != NIL) { mpush(MBEGIN); vpush(tl); }
             return ad;
         case S_IFNIL:   // (ifnil any any)
-            SYNTAX_IF(x, 3, 3);
+            SYNTAX_IF(x, 2, 2);
             mpush(MOR);
-            vpush(caddr(x));
-            mpush(MEXPR);
+            vpush(cdr(tl));
             return ad;
         case S_LAMBDA:  // (lambda lst any ...)
-            SYNTAX_IF(x, 3, -1);
-            ERROR_IF(malformed(x), "syntax", x);
-            n = cons(Env, cddr(x));
-            n = cons_tag(ad, n, CLOS_TAG);
-            vpush(n);
-            ad = cons(S_self, n);
-            ad = cons(ad, NIL);
-            ad = cons(ad, Env);
-            set_car(cdr(n), ad);
+            SYNTAX_IF(x, 2, -1);
+            ERROR_IF(malformed(x), Syntax, x);
+            tl = cons(Env, cdr(tl));
+            tl = cons_tag(ad, tl, CLOS_TAG);
+            vpush(tl);
+            hd = cons(S_self, tl);
+            hd = cons(hd, Env);
+            set_car(cdr(tl), hd);
             return vpop();
         case S_LET:     // (let (v e) body ...)
-            SYNTAX_IF(x, 3, -1);
-            ERROR_IF(isAtom(ad) || !isSymbol(car(ad)) || (car(ad) < NRESERVED)
-                     || (car(ad) == S_self) || badarity(ad, 2, 2), "syntax", x);
-            vpush(car(ad));
-            vpush(cddr(x));
+            SYNTAX_IF(x, 2, -1);
+            ERROR_IF(isAtom(ad) || badarity(ad, 1, 1), Syntax, x);
+            hd = car(ad);
+            ERROR_IF(!isSymbol(hd) || (hd < NRESERVED) || (hd == S_self), Syntax, x);
+            vpush(hd);
+            vpush(cdr(tl));
             mpush(MLET);
-            mpush(MEXPR);
             return cadr(ad);
         case S_DEFINE:  // (define sym any)
-            SYNTAX_IF(x, 3, 3);
-            ERROR_IF(!isSymbol(ad), "type", x);
+            SYNTAX_IF(x, 2, 2);
+            ERROR_IF(!isSymbol(ad), Type, x);
+            ERROR_IF((ad < NRESERVED) || (ad == S_ans) || (ad == S_ver) || (ad == S_self), "reserved", ad);
+            if (Fixed && (UNDEF != cdr(ad))) {
+                for (hd = UserDef; hd != NIL; hd = cdr(hd))
+                    if (car(hd) == ad) break;
+                ERROR_IF(hd == NIL, "fixed", ad);
+            }
             mpush(MSET);
             vpush(ad);        // name
-            mpush(MEXPR);
-            return caddr(x);  // value
-        default:
+            return cadr(tl);  // value
+        default:        // unreachable
             return syntax(x);
     }
 }
@@ -838,127 +880,160 @@ node eval(node x) {
     node i, n;
     node vsave = Vstack;
     unsigned int msave = Mstack;
-    register char m = MEXPR;
+    char m = MEXPR;
     Acc = x;
     mpush(MHALT);
 
-    while (!Interrupted && !Quit) {
+    while ((m != MHALT) && (ERR != Acc)) {
+        if (Interrupted) { Acc = ERR;   break; }
+        if (Quit)        { Acc = UNDEF; break; }
+
         switch (m) {
+            case MOR:     // resume after evaluating "ifnil"
+                if (NIL != Acc) { vpop(); m = mpop(); break; }
+                Acc = K_TRUE;
+            case MPRED:   // resume after evaluating "if"
+                n = vpop();
+                if (NIL == Acc) n = cdr(n);
+                if (NIL == n) { Acc = NIL; m = mpop(); break; }
+                Acc = car(n);
             case MEXPR:   // evaluate Acc as an expression
-                if (isSymbol(Acc)) {
-                    n = Acc;
-                    Acc = lookup(Acc);
-                    BREAK_IF(UNDEF == Acc, Acc, "undefined", n);
+                if (isAtom(Acc)) {
+                    if (isSymbol(Acc)) {
+                        n = Acc;
+                        Acc = lookup(Acc);
+                        BREAK_IF(UNDEF == Acc, Acc, Undefined, n);
+                    }
                     m = mpop();
-                } else if (isAtom(Acc)) m = mpop();
-                else if (car(Acc) < NSPECIAL) { Acc = special(Acc); m = mpop(); }
-                else {
-                    vpush(cdr(Acc));  // unevaluated argument list
-                    vpush(NIL);       // result evaluated argument list
-                    Acc = car(Acc);
-                    if (Acc < NRESERVED) m = MLIST; else mpush(MLIST);  // reserved heads self-evaluate: skip the MEXPR trip
+                    break;
                 }
-                break;
-            case MLIST:   // accumulating an evaluated argument list
-                n = cons(Acc, NIL);
-                if (NIL == car(Vstack)) set_car(Vstack, n);
-                else {
-                    for(i = car(Vstack); cdr(i) != NIL; i = cdr(i)) ;
-                    set_cdr(i, n);
+                n = car(Acc);
+                if (n < NSPECIAL) {
+                    if (S_QUOTE == n) {
+                        Acc = badarity(Acc, 1, 1) ? syntax(Acc) : cadr(Acc);
+                        m = mpop();
+                    } else {
+                        Acc = special(Acc);
+                        m = MEXPR;
+                    }
+                    break;
                 }
-                i = cadr(Vstack);
-                if (isAtom(i)) {  // all arguments evaluated or improper tail
-                    BREAK_IF(i != NIL, Acc, "improper call", i);
-                    Acc = car(Vstack);
-                    vpop();
-                    vpop();
+                if ((F_CONS == n) && isTail() && !badarity(Acc, 2, 2)) {
+                    n = cdr(Acc);
+                    if (MCHAIN != Modes[Mstack]) {
+                        i = cons(NIL, NIL);
+                        vpush(i); vpush(i);
+                        mpush(MCHAIN);
+                    }
+                    vpush(cadr(n));
+                    mpush(MCONS);
+                    Acc = car(n);
+                    m = MEXPR;
+                    break;
+                }
+                vpush(cdr(Acc));  // unevaluated argument list
+                vpush(NIL);       // result evaluated argument list
+                Acc = n;
+                if (n >= NRESERVED) {
+                    if (!isSymbol(n)) { mpush(MLIST); m = MEXPR; break; }
+                    Acc = lookup(n);
+                    BREAK_IF(UNDEF == Acc, Acc, Undefined, n);
+                }
+            case MLIST:   // collect evaluated head and arguments
+                set_car(Vstack, cons(Acc, car(Vstack)));
+                n = cadr(Vstack);  // arguments not yet evaluated
+                if (!isAtom(n)) {  // evaluate next
+                    set_car(cdr(Vstack), cdr(n));
+                    Acc = car(n);
+                    mpush(MLIST);
+                    m = MEXPR;
+                    break;
+                }
+                BREAK_IF(n != NIL, Acc, "improper call", n);
+                i = car(Vstack);
+                for (Acc = NIL; i != NIL; i = n) {  // reverse
+                    n = cdr(i);
+                    set_cdr(i, Acc);
+                    Acc = i;
+                }
+                vpop();
+                vpop();
+            case MCALL:   // application: builtin or closure
+                n = car(Acc);
+                if (F_APPLY == n) {   // (apply fn args) -> (fn . args), re-dispatch
+                    BREAK_IF(badarity(Acc, 2, 2), Acc, Syntax, Acc);
+                    Acc = cons(cadr(Acc), caddr(Acc));
+                    BREAK_IF(badarity(Acc, 0, -1), Acc, Syntax, Acc);
                     m = MCALL;
-                } else {          // evaluate next argument
-                    Acc = car(i);
-                    set_car(cdr(Vstack), cdr(i));
-                    mpush(m);
+                } else if (n < NBUILTIN) {
+                    Acc = builtin(Acc);
+                    m = mpop();
+                } else {
+                    BREAK_IF(!isClosure(n), Acc, Type, Acc);
+                    Acc = funapp(n, cdr(Acc));
                     m = MEXPR;
                 }
                 break;
+            case MLET:
+                n = cons(cadr(Vstack), Acc);
+                if (isTail()) {
+                    set_cdr(Vstack, cddr(Vstack));
+                } else {
+                    set_car(cdr(Vstack), Env);  // overwrite the name with the env to restore
+                    mpush(MRETN);
+                }
+                Env = cons(n, Env);
             case MBEGIN:  // sequencing of a body
-                if (NIL == cdar(Vstack)) Acc = car(vpop());
+                n = car(Vstack);
+                Acc = car(n);
+                n = cdr(n);
+                if (NIL == n) vpop();
                 else {
-                    Acc = caar(Vstack);
-                    set_car(Vstack, cdar(Vstack));
+                    set_car(Vstack, n);
                     mpush(MBEGIN);
                 }
                 m = MEXPR;
                 break;
-            case MPRED:   // resume after evaluating "if"
-                n = vpop();
-                m = MEXPR;
-                if (NIL != Acc) Acc = car(n);
-                else if (NIL == cdr(n)) { Acc = UNDEF; m = mpop(); }
-                else Acc = cadr(n);
-                break;
-            case MOR:     // resume after evaluating "ifnil"
-                n = vpop();
-                if (NIL == Acc) { Acc = n; m = MEXPR; }
-                else m = mpop();
-                break;
-            case MCALL:   // application: builtin or closure
-                n = car(Acc);
-                if (isSymbol(n)) {
-                    if (F_APPLY == n) {   // (apply fn args) -> (fn . args), re-dispatch
-                        BREAK_IF(badarity(Acc, 3, 3), Acc, "syntax", Acc);
-                        Acc = cons(cadr(Acc), caddr(Acc));
-                        break;
-                    }
-                    Acc = builtin(Acc);
-                } else Acc = funapp(Acc);
-                m = mpop();
-                break;
-            case MHALT:   // returns from eval
-                Vstack = vsave;
-                Mstack = msave;
-                return Acc;
             case MSET:    // resume after evaluating "define" value
                 n = vpop();
-                BREAK_IF(UNDEF == Acc, Acc, "undefined", n);
-                BREAK_IF((n == S_ans) || (n == S_ver) || (n == S_self) ||
-                         (n < NRESERVED), Acc, "reserved", n);  // The second last test catches SPCL symbols, the last test prevents immutable symbols
-                if(Fixed) {
-                    if (UNDEF == cdr(n)) UserDef = cons(n, UserDef);
-                    else {
-                        for (i = UserDef; i != NIL; i = cdr(i))
-                            if (car(i) == n) break;
-                        BREAK_IF(i == NIL, Acc,"fixed", n);
-                    }
-                } else if (UNDEF == cdr(n)) StdDef = cons(n, StdDef);
+                BREAK_IF(UNDEF == Acc, Acc, Undefined, n);
+                if (UNDEF == cdr(n)) {
+                    if (Fixed) UserDef = cons(n, UserDef);
+                    else       StdDef  = cons(n, StdDef);
+                }
                 set_cdr(n, Acc);
                 m = mpop();
                 break;
-            case MLET:
-                n = cons(cadr(Vstack), Acc);
-                n = cons(n, NIL);
-                set_car(cdr(Vstack), Env);  // overwrite the pushed variable name with Env
-                Env = cons(n, Env);
-                mpush(MRETN);
-                m = MBEGIN;
+            case MCONS:   // evaluated head; append a cell, tail-eval the rest
+                n = cdr(Vstack);
+                Acc = cons(Acc, NIL);
+                set_cdr(car(n), Acc);
+                set_car(n, Acc);
+                Acc = vpop();
+                m = MEXPR;
+                break;
+            case MCHAIN:  // close the cons chain
+                set_cdr(vpop(), Acc);
+                Acc = cdr(vpop());
+                m = mpop();
                 break;
             case MRETN:   // restore callers Env after a non-tail call
                 Env = vpop();
                 m = mpop();
                 break;
         }
-        if (ERR == Acc) break;
     }
     Vstack = vsave;
     Mstack = msave;
-    return (Interrupted || (ERR == Acc)) ? ERR : UNDEF;
+    return Acc;
 }
 
 // Load script file
 node load(const char *s, bool ie) {
     int fd;
-    ERROR_IF(IOdepth >= NLOAD, "nested load", UNDEF);
+    if (IOdepth >= NLOAD) { error("nested load", UNDEF); return K_ERR; }
     fd = sys_open(s);
-    ERROR_IF(fd < 0, s, UNDEF);
+    if (fd < 0) { error(s, UNDEF); return K_ERR; }
 
     IOdepth++; IO.fd = fd; IO.pos = IO.len = 0; IO.next = EOT;
 
@@ -979,12 +1054,18 @@ node load(const char *s, bool ie) {
 
     sys_close(fd);
     IOdepth--;
-    return (ERR == Acc) ? ERR : cdr(S_ans);
+    if (Interrupted) set_ans(K_ERR);
+    return cdr(S_ans);
 }
+
+// Entrypoint ##################################################################
+
+// Break interrupt handler
+void _interrupt _far _loadds on_break(void) { Interrupted = TRUE; }
 
 // Register reserved symbols (needs to be same sequence as in enum)
 void reserved(void) {
-    static const char* names[NRESERVED];
+    const char* names[NRESERVED];
     unsigned int i;
 
     names[S_BEGIN]  = "begin";     names[S_DEFINE]  = "define";
@@ -1009,74 +1090,54 @@ void reserved(void) {
     names[K_VERSTR]  = NAME "-" VERSION;
 
     for (i = 0; i < NRESERVED; i++)
-        if (add_sym(names[i], SPCL) != i) error("init reserved", UNDEF);
+        if (add_sym(names[i], SPCL) != i) fatal("init reserved");
 
     S_ans   = add_sym("ans", NIL);
     S_self  = add_sym("self", UNDEF);
     S_ver   = add_sym("ver", K_VERSTR);
 }
 
-// Entrypoint ##################################################################
-
-// Break interrupt handler
-void _interrupt _far _loadds on_break(void) { Interrupted = TRUE; }
+// Build standard library path
+void stdpath(char* buf, const char* exe) {
+    char *dir = buf, *p = buf;
+    for (; *exe; exe++) {
+        *p++ = *exe;
+        if ((*exe == '\\') || (*exe == ':')) dir = p;
+    }
+    strcp(dir, STDLIB);
+}
 
 // Reset state
 void reset(void) {
     Interrupted = 0;
-    Rdlines = Parens = Skip = Mstack = 0;
+    Modes[0] = MHALT;
+    Parens = Skip = Mstack = 0;
     Acc = Env = Vstack = Tmpcar = Tmpcdr = NIL;
-}
-
-// Display help
-node help(void) {
-    node u;
-    sys_print("special forms:" DOS_EOL);
-    for (u = 0; u < NSPECIAL; u++) { sys_print(" "); sys_print(symstr(u)); }
-    sys_print(DOS_EOL "builtin functions:" DOS_EOL);
-    for (u = NSPECIAL; u < K_COMMENT; u++) { sys_print(" "); sys_print(symstr(u)); }
-    sys_print(DOS_EOL "standard library:" DOS_EOL);
-    for (u = StdDef; u != NIL; u = cdr(u)) { sys_print(" "); sys_print(symstr(car(u))); }
-    sys_newline();
-    return UNDEF;
-}
-
-void stdpath(char *buf, const char *exe) {
-    const char *p;
-    char *slash = buf;
-    for (p = exe; *p; p++) {
-        *buf++ = *p;
-        if (*p == '\\') slash = buf;
-    }
-    buf = slash;
-    for (p = STDLIB; *p; p++) *buf++ = *p;
-    *buf = 0;
 }
 
 // Entrypoint
 int main(int argc, char **argv) {
     register unsigned int i;
     bool ignore, batch, status = 0;
-    char stdlib[82];
+    char stdlib[84];
 
     // Welcome banner
-    sys_print(DOS_EOL TITLE DOS_EOL DOS_EOL);
+    sys_stamp(DOS_EOL TITLE DOS_EOL DOS_EOL);
 
     // Help screen
     if ((argc > 1) && streq(argv[1], "/?")) {
-        sys_print("Usage: " NAME " [/?] [/b] [/i] [file]" DOS_EOL DOS_EOL
+        sys_stamp("Usage: " NAME " [/?] [/B] [/I] [file]" DOS_EOL DOS_EOL
                   "  /?       This help" DOS_EOL
                   "  file     Load file" DOS_EOL
-                  "  /b file  Load file, exit" DOS_EOL
-                  "  /i file  Load file (ignore errors), exit" DOS_EOL DOS_EOL);
+                  "  /B file  Load file, exit" DOS_EOL
+                  "  /I file  Load file (ignore errors), exit" DOS_EOL DOS_EOL);
         return 0;
     }
 
     // Set break interrupt handler
     sys_break((void (_interrupt _far *)(void)) on_break);
 
-    // Restart anchor
-    restart:
+    restart:  // Restart anchor
 
     // Init reader
     IOdepth = 0; IO.fd = IO.pos = IO.len = 0; IO.next = EOT;
@@ -1085,28 +1146,26 @@ int main(int argc, char **argv) {
     for (i = NRESERVED; i < NNODES-1; i++) Heap[i].cdr = i+1;
     Heap[NNODES-1].cdr = NIL;
     Freelist = NRESERVED;
+    reset();
     reserved();
 
     // Load standard library
     stdpath(stdlib, argv[0]);
-    if (ERR == load(stdlib, FALSE)) error("stdlib", UNDEF);
+    load(stdlib, FALSE);
     Fixed = TRUE;
 
     // Load script CLI arguments
     if (Restartbuf[0]) {
-        reset();
         load(Restartbuf, FALSE);
-        Restartbuf[0] = 0;
     } else if (argc > 1) {
-        reset();
-        ignore = streq(argv[1], "/i");
-        batch = streq(argv[1], "/b") || ignore;
+        ignore = streq(argv[1], "/I") || streq(argv[1], "/i");
+        batch = streq(argv[1], "/B") || streq(argv[1], "/b") || ignore;
         if (batch && (argc < 3)) {
-            error("missing filename", UNDEF);
+            sys_stamp("missing filename" DOS_EOL);
             status = 1;
             Quit = TRUE;
         } else {
-            status = load(batch ? argv[2] : argv[1], ignore) == ERR;
+            status = (load(batch ? argv[2] : argv[1], ignore) == K_ERR);
             if (batch) Quit = TRUE;
         }
     }
@@ -1116,7 +1175,7 @@ int main(int argc, char **argv) {
         reset();
         Acc = parse();
         if ((EOT == Acc) && !Interrupted) break;
-        if (K_HELP == Acc) Acc =  help();
+        if (K_HELP == Acc) Acc = print_help();
         if (UNDEF == Acc) continue;
         if ((ERR != Acc) && !Interrupted) Acc = eval(Acc);
         if ((ERR == Acc) || Interrupted) {
@@ -1131,21 +1190,17 @@ int main(int argc, char **argv) {
     }
 
     // Restart
-    if (Restartsym != UNDEF) {
-        Restartbuf[0] = 0;
-        if (Restartsym != NIL)
-            for (i = 0; Restartbuf[i] = symstr(Restartsym)[i]; i++) ;
-        Restartsym = UNDEF;
+    if (Restart) {
         Symtop = Pooltop = 0;
         Symbols = StdDef = UserDef = NIL;
-        Fixed = Quit = FALSE;
+        Restart = Fixed = Quit = FALSE;
         reset();
         argc = 1;
         goto restart;
     }
 
     // Exit banner
-    sys_print(DOS_EOL "Bye" DOS_EOL DOS_EOL);
+    sys_stamp(DOS_EOL "Bye" DOS_EOL DOS_EOL);
 
     sys_break(NONE);
     return status;
