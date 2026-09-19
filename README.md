@@ -1,8 +1,8 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.4) Features
+## Version (0.5) Features
 
-* Scheme-like
+* Scheme-inspired
 * LISP Interpreter
 * for DOS (or DOSbox)
 * in 16-bit Real Mode
@@ -11,7 +11,7 @@
 * Lexical Scoping
 * Mark & Sweep Garbage Collector
 * Trampoline Evaluator
-* ~1K Lines of Code (C89)
+* ~1.1K Lines of Code (C89)
 * 8 Special Forms
 * 21 Builtin Functions
 * 21 Function Standard Library
@@ -33,7 +33,7 @@
 SLED (**S**chemy **L**isp **e**n **D**OS) is a purely symbolic **LISP** (LISt
 Processor) with functionality (largely) inspired by **Scheme**. Originally
 derived from the fantastic [Kilo LISP](https://t3x.org/klisp), but reduced by
-some features (such as macros), and enhanced with others. SLED can be classified
+some features (such as macros), and enhanced with others, SLED can be classified
 as an Ur-Lisp and runs on a **DOS** (Disk Operating System) such as
 [FreeDOS](https://freedos.org) or MS-DOS, as well as on DOS-emulators like
 [DOSBox](https://dosbox.com), [DOSBox-X](https://dosbox-x.com), or
@@ -42,25 +42,40 @@ For an overview of provided symbols, special forms, builtin functions, and
 standard library see the [index](#index).
 Get SLED:
 
-* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/download/v0.4/SLED-0_4.ZIP)
+* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/download/v0.5/SLED-0_5.ZIP)
 * [Source Code Repository](https://codeberg.org/gramian/sled)
 * [Backup Repository](https://github.com/gramian/sled)
 
 Overall, SLED is a LISP for DOS.
 
+### Language
+
+Lists are a computer language in a most general sense: they can be a programming
+language, a data format, or a serialization. Thus lists are a fundamental
+representation of data and code. In Lisp, a list is enclosed by parentheses `(`,
+`)`, and list elements are delimited by a space ` `.
+
+```
+(begin lisp)
+```
+
+If a list is representing code, its first element denotes the action (function),
+as in polish notation or verb-subject-object languages in general. Typically,
+Scheme LISP classifies as a functional programming language.
+
 ## Data
 
 There are two fundamental data types: **Pairs** and **Atoms** (not-pairs). Atoms
 come in three variants: **Symbols**, **Closures** (functions), and some
-special values.
+**Special Symbols**.
 
 ### Symbols
 
 **Symbols** are unique names and consist of any combination of maximum 16 of
-the following characters:
+the following forty characters:
 
 ```
-a b c d e f g h i j k l m n o p q r s t u v w x y z 1 2 3 4 5 6 7 8 9 0 - . ? _
+a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ - ? .
 ```
 
 where `.` cannot be the leading character.
@@ -98,10 +113,15 @@ For convenience the `'` short form syntax may be used:
 
 Essentially quoting declares something as data instead of code.
 
+#### Empty List
+
+The `nil` special symbol has multiple meanings: It represents the empty list, so
+it is equivalent to `'()`; it is also the only value evaluating to "false".
+
 ### Pairs
 
 Pairs consist of a **head** and a **tail**, each holding either an `atom` or
-another `pair`. A pair can be created as data using the `.`:
+another `pair`. A pair can be created as data using the `.` (dot):
 
 ```
 '(a . x)
@@ -156,14 +176,15 @@ An association list is a list where each element is a pair (association):
 ((a . x) (b . y) (c . z))
 ```
 
-The head part of such a pair is called **key** and the tail is called **value**.
+The head part of such a pair element is called **key** and the tail is called
+**value**.
 
 ### S-Expressions
 
 A symbolic expression (S-expression) is a data structure defined as:
 An S-expression is either an atom or a pair of S-expressions.
-In Lisp, Scheme, and in particular in SLED, S-expressions are used for data and
-source code.
+In Lisp, Scheme, and in particular in SLED, S-expressions are used for data as
+well as source code.
 
 ### Numbers
 
@@ -179,7 +200,7 @@ The SLED system does not feature numeric types. Yet natural numbers
 
 These are tally numerals, so cardinality represents the magnitude, which is
 similar to von Neumann ordinals. The functions `inc`, `dec`, and `zero?`
-facilitate counting tasks.
+help with counting tasks.
 
 ## Code
 
@@ -346,7 +367,7 @@ The file path also falls under the 16 character limit.
 
 ### REPL
 
-Once `sled` started, the read-eval-print-loop (REPL) begins with a prompt:
+Once `sled` has started, the read-eval-print-loop (REPL) begins with a prompt:
 
 ```
 sled>
@@ -357,7 +378,7 @@ It reads input, evaluates it, prints the result, and prompts again.
 Now have fun:
 
 ```
-sled> (println 'hello\ world)
+sled> (println 'hello _ 'world)
 ```
 
 #### Extended Characters
@@ -365,7 +386,8 @@ sled> (println 'hello\ world)
 A pitfall is extended (two-byte) characters which are not supported. An example
 is using the arrow keys in the REPL, resulting in an `α` (alpha) in the standard
 input echo. These extended characters pollute the input stream and can cause an
-error in an input line even if deleted.
+error in an input line even if deleted. Hence, a line containing an extended
+character throws an error and discards the line.
 
 ### Exiting
 
@@ -393,7 +415,7 @@ Comments are ignored by the parser. A comment is introduced by a semicolon:
 ```
 
 All characters until the next line break are ignored by the parser.
-Traditionally, the number of consecutive semicolons convey semantics,
+Traditionally, the number of consecutive semicolons conveys semantics,
 similar to Markdown headings:
 
 ```
@@ -440,7 +462,7 @@ functions, and standard library symbols.
 As real-mode DOS program, SLED has multiple constraints:
 
 * The heap has 12288 nodes
-* The symbol table has 2048 characters
+* The symbol table has 4096 characters
 
 The standard library consumes about 5% of nodes and characters.
 
@@ -491,7 +513,7 @@ The standard library consumes about 5% of nodes and characters.
 | [`inc`](#inc-arg)                   | [`list`](#list-arg1-argn)       | [`list?`](#list-arg)             |
 | [`map`](#map-fun-lst)               | [`member`](#member-arg-lst)     | [`or?`](#or-arg1-arg2)           |
 | [`pair?`](#pair-arg)                | [`printid`](#printid-arg1-arg2) | [`println`](#println-arg1-argn)  |
-| [`put`](#put-sym-arg-lst)           | [`reverse`](#reverse-lst)       | [`shorter?`](#shorter-lst1-lst2) |
+| [`put`](#put-sym-arg-lst)           | [`revpend`](#revpend-lst1-lst2) | [`shorter?`](#shorter-lst1-lst2) |
 
 ---
 
@@ -658,7 +680,7 @@ and second argument as tail.
 ### `dec <arg>`
 
 This **standard library** unary function returns the tail of a list if not
-empty; use to decrement von Neumann ordinals.
+empty; use to decrement tally numbers.
 
 ```
 (dec '(nil . nil))  ; → nil
@@ -685,7 +707,7 @@ symbols.
 ### `defined? <sym>`
 
 This **builtin** unary predicate answers if the argument symbol is already
-defined.
+defined at global scope.
 
 ```
 (defined? 'defined?)   ; → true
@@ -709,7 +731,7 @@ This **builtin** unary predicate answers if its argument is the empty list.
 This **builtin** thunk prints the current user-defined symbols.
 
 ```
-(env)
+(env)  ; → nil
 ```
 
 ---
@@ -717,7 +739,7 @@ This **builtin** thunk prints the current user-defined symbols.
 ### `eof? <arg>`
 
 This **builtin** unary predicate answers if its argument evaluates to an
-end-of-file (EOF) or end-of-transmission (EOT) symbol.
+end-of-file (EOF) or end-of-transmission (EOT) marker.
 
 ```
 (ifnil (eof? (read)) 'none)
@@ -754,7 +776,8 @@ Use to compare atoms.
 This **special symbol** marks an error state.
 
 ```
-(head nil) (equiv? err ans)  ; → true
+(head nil)        ; → *error*
+(equiv? err ans)  ; → true
 ```
 
 ---
@@ -777,7 +800,8 @@ This **standard library** thunk predicate answers if the previous evaluation
 resulted in an error.
 
 ```
-(head nil) (error?)  ; → true
+(head nil)  ; → *error*
+(error?)    ; → true
 ```
 
 ---
@@ -798,9 +822,9 @@ This **builtin** procedure triggers garbage collection. Node usage is printed if
 an argument is provided which is not `nil`.
 
 ```
-(gc)       ; → *no output*
-(gc nil)   ; → *no output*
-(gc true)  ; → (prints node usage)
+(gc)       ; → nil
+(gc nil)   ; → nil
+(gc true)  ; → nil
 ```
 
 ---
@@ -816,7 +840,7 @@ otherwise.
 (get 'z '((a . x) (b . y)))  ; → nil
 ```
 
-> **NOTE:** Uses `equiv?` for comparisons.
+> **NOTE:** Uses `equiv?` for key comparisons.
 
 ---
 
@@ -847,7 +871,7 @@ function.
 
 This **special form** evaluates the first argument; if it does not evaluate to
 `nil`, the second argument is evaluated and returned, otherwise the third
-argument is evaluated and returned or `nil` if no third argument is given.
+argument is evaluated and returned, or `nil` if no third argument is given.
 
 ```
 (if 'ok 'con 'alt)  ; → con
@@ -873,7 +897,7 @@ if it is not `nil`, otherwise the second argument is evaluated and returned.
 ### `inc <arg>`
 
 This **standard library** unary function prepends `nil` to a list. Use to
-increment von Neumann ordinals.
+increment tally numbers.
 
 ```
 (inc nil)     ; → (nil)
@@ -935,8 +959,8 @@ list.
 ### `load <sym> [<arg>]`
 
 This **builtin** function evaluates the contents of the file given by the
-argument symbol (path) and returns the last answer. If a second argument which
-is not `nil` is given then errors are ignored during loading.
+argument symbol (path) and returns the last answer. If a second argument, which
+is not `nil`, is given then errors are ignored during loading.
 
 ```
 (load 'myscript.scm)
@@ -969,7 +993,7 @@ argument list whose head is the first argument; otherwise `nil` is returned.
 (member 'd '(a b c))  ; → nil
 ```
 
-> **NOTE:** Uses `equiv?` for comparisons.
+> **NOTE:** Uses `equiv?` for list element comparisons.
 
 ---
 
@@ -978,7 +1002,7 @@ argument list whose head is the first argument; otherwise `nil` is returned.
 This **builtin** thunk prints a line break; use for output formatting.
 
 ```
-(newline)
+(newline)  ; → nil
 ```
 
 ---
@@ -986,7 +1010,7 @@ This **builtin** thunk prints a line break; use for output formatting.
 ### `nil`
 
 This **special symbol** represents the empty list; and is also the only value
-evaluating to false. Equivalently, `'()` can be used for `nil`.
+evaluating to "false". Equivalently, `'()` can be used for `nil`.
 
 ```
 nil  ; → nil
@@ -1055,9 +1079,9 @@ atom.
 This **builtin** variadic procedure prints its arguments to the standard output.
 
 ```
-(print 'hi)
-(print 'hello _ 'world)
-(print '(a b))
+(print 'hi)              ; → nil
+(print 'hello _ 'world)  ; → nil
+(print '(a b))           ; → nil
 ```
 
 ---
@@ -1065,10 +1089,10 @@ This **builtin** variadic procedure prints its arguments to the standard output.
 ### `printid <arg1> [<arg2>]`
 
 This **standard library** function returns the first argument after printing
-it and a line break; if given the second argument is printed before the first.
+it and a line break; if given, the second argument is printed before the first.
 
 ```
-(printid ans 'answer)
+(printid '42 'answer)  ; → 42
 ```
 
 ---
@@ -1079,9 +1103,9 @@ This **standard library** variadic procedure prints its arguments to the
 standard output and appends a line break.
 
 ```
-(println 'hi)
-(println 'hello _ 'world)
-(println '(a b))
+(println 'hi)              ; → nil
+(println 'hello _ 'world)  ; → nil
+(println '(a b))           ; → nil
 ```
 
 ---
@@ -1137,7 +1161,7 @@ This **special form** returns its argument unevaluated.
 ### `read`
 
 This **builtin** thunk returns a symbol read as a line of input from the
-standard input source terminated by a line break via return key / enter key.
+keyboard terminated by a line break via return key / enter key.
 
 ```
 (read)
@@ -1156,12 +1180,14 @@ loads a file specified by the symbol argument. All definitions are lost!
 
 ---
 
-### `reverse <lst>`
+### `revpend <lst1> <lst2>`
 
-This **standard library** unary function reverses its list argument.
+This **standard library** binary function reverses its first argument list and
+appends the second argument list. Use also to reverse a list.
 
 ```
-(reverse (list 'a 'b 'c))  ; → (c b a)
+(revpend (list 'a 'b 'c) '(d e))  ; → (c b a d e)
+(revpend (list 'a 'b 'c) nil)     ; → (c b a)
 ```
 
 ---
@@ -1182,7 +1208,7 @@ resolves to the enclosing `lambda`. Outside a `lambda`, `self` is undefined.
 ### `shorter? <lst1> <lst2>`
 
 This **standard library** binary predicate answers if the first argument list
-has less elements than the second argument list.
+has fewer elements than the second argument list.
 
 ```
 (shorter? nil (list nil))  ; → true
@@ -1215,7 +1241,7 @@ This **builtin** unary function returns the tail part of a cons cell.
 
 ### `true`
 
-This **special symbol** evaluates to true. Use as a generic true value.
+This **special symbol** evaluates to true. Use as a generic "true" value.
 
 ```
 true  ; → true
@@ -1229,7 +1255,7 @@ This **builtin** unary function resolves the value of its symbol argument.
 Respects lexical scope.
 
 ```
-(value 'ver)  ; → sled-0.4
+(value 'ver)  ; → sled-0.5
 ```
 
 ---
@@ -1239,14 +1265,14 @@ Respects lexical scope.
 This **special symbol** evaluates to a symbol pinpointing the version of SLED.
 
 ```
-ver  ; → sled-0.4
+ver  ; → sled-0.5
 ```
 
 ---
 
 ### `zero? <arg>`
 
-This is a **standard alias** for `empty?`; use for testing von Neumann ordinals.
+This is a **standard alias** for `empty?`; use for testing tally numbers.
 
 ```
 (zero? nil)     ; → true
@@ -1255,9 +1281,12 @@ This is a **standard alias** for `empty?`; use for testing von Neumann ordinals.
 
 ## Usage
 
-* SLED is made for a disk operating system like **FreeDOS** or **MS-DOS**
+* SLED is made for a disk operating system like **FreeDOS** or **MS-DOS** (>=3)
 * Outside DOS, a DOS emulator like **DOSBox**, **DOSBox-X**, **DOSBox-Staging** is required
-* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, MacOS, or Unix.
+* No libc, all I/O goes through `int 21h` directly
+* Uses real mode "small memory model" (64K data segment and 64K code segment)
+* Minimally, a 286 CPU with 256K RAM should be sufficient
+* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, MacOS, or Unix
 * Building SLED requires [Microsoft C Compiler](https://github.com/davidly/dos_compilers) or [Open Watcom](https://github.com/open-watcom/open-watcom-v2), as well as `make`
 * Build with MS C 6.0A: `make build_msc` (Compiler location via `MSC`)
 * Build with Open Watcom V2: `make build_owc` (Compiler location via `OWC`)

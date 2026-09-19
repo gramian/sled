@@ -9,8 +9,9 @@ ifeq ($(strip $(DOSBOX)),)
 $(error No DOSBox found. Install dosbox, dosbox-x or dosbox-staging, or set DOSBOX=/path/to/dosbox)
 endif
 
-SRC      = sled.c
-OUT      = SLED.EXE
+SRC    = sled.c
+OUT    = SLED.EXE
+STK    = 4096
 
 dosbox = $(DOSBOX) \
 	-c "config -set cpu cycles=$(1)" \
@@ -25,7 +26,7 @@ build_msc:
 		-c "set PATH=C:\BIN;C:\BINB" \
 		-c "set INCLUDE=C:\INCLUDE" \
 		-c "set LIB=C:\LIB" \
-		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 $(SRC) /link /NOE /STACK:8192 > BUILD.LOG" \
+		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 $(SRC) /link /NOE /STACK:$(STK) > BUILD.LOG" \
 		-c "exit"
 	cat BUILD.LOG
 	ls -lS $(OUT)
@@ -35,7 +36,7 @@ build_owc:
 		-c "mount c $(OWC)" \
 		-c "set WATCOM=C:\ " \
 		-c "set PATH=C:\BINW" \
-		-c "wcl /ms /fe=$(OUT) /l=dos /w2 /ox /zp=2 /2 $(SRC) /k8192 > BUILD.LOG" \
+		-c "wcl /ms /fe=$(OUT) /l=dos /w2 /ox /zp=2 /2 $(SRC) /k$(STK) > BUILD.LOG" \
 		-c "exit"
 	cat BUILD.LOG
 	ls -lS $(OUT)

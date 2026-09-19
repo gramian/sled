@@ -88,7 +88,7 @@ nil
 
 (check 'self 'a (equiv? (count '(a b c)) 'done))
 
-(check 'self 'b (proc? (lambda (x) self)))
+(check 'self 'b ((lambda () (proc? self))))
 
 (newline)
 
@@ -106,7 +106,7 @@ nil
 
 (check 'ver 'a (symbol? ver))
 
-(check 'ver 'b (equiv? ver 'sled-0.4))
+(check 'ver 'b (equiv? ver 'sled-0.5))
 
 (newline)
 
@@ -438,7 +438,7 @@ nil
 
 ;; value
 
-(check 'value 'a (equiv? (value 'ver) 'sled-0.4))
+(check 'value 'a (equiv? (value 'ver) 'sled-0.5))
 
 (define aa 'x)
 
@@ -742,15 +742,23 @@ nil
 
 (newline)
 
-;; reverse
+;; revpend
 
-(check 'reverse 'a (equal? (reverse nil) nil))
+(check 'revpend 'a (equal? (revpend nil nil) nil))
 
-(check 'reverse 'b (equal? (reverse '(x)) '(x)))
+(check 'revpend 'b (equal? (revpend '(x) nil) '(x)))
 
-(check 'reverse 'c (equal? (reverse '(x y)) '(y x)))
+(check 'revpend 'c (equal? (revpend '(x y) nil) '(y x)))
 
-(check 'reverse 'd (equal? (reverse '(x y z)) '(z y x)))
+(check 'revpend 'd (equal? (revpend '(x y z) nil) '(z y x)))
+
+(check 'revpend 'e (equal? (revpend nil '(a)) '(a)))
+
+(check 'revpend 'f (equal? (revpend nil '(a b)) '(a b)))
+
+(check 'revpend 'g (equal? (revpend '(x y z) '(a)) '(z y x a)))
+
+(check 'revpend 'h (equal? (revpend '(x y z) '(a b)) '(z y x a b)))
 
 (newline)
 

@@ -17,7 +17,7 @@
 ;; Exit the interpreter
 (define quit exit)
 
-;; Answers if the von Neumann ordinal argument is zero
+;; Answers if the tally number argument is zero
 (define zero? empty?)
 
 ;;; Functions
@@ -98,14 +98,14 @@
 (define pair? (lambda (x)
   (if (atom? x) nil true)))
 
-;; Returns first argument after printing (optional and) first argument
+;; Returns first argument after printing (optional second) first argument
 (define printid (lambda (x . y)
   (if y (print (head y) '\:\ ))
   (print x)
   (newline)
   x))
 
-;; Print argument and break line
+;; Print argument(s) and break line
 (define println (lambda x
   (apply print x)
   (newline)))
@@ -118,12 +118,11 @@
         (cons (head l) (self x y (tail l))))
     (cons (cons x y) nil))))
 
-;; Returns reverse of argument list
-(define reverse (lambda (l)
-  ((lambda (l a)
-    (if (empty? l) a
-      (self (tail l) (cons (head l) a))))
-   l nil)))
+
+;; Returns reverse of first argument list prepended to second argument list
+(define revpend (lambda (l a)
+  (if (empty? l) a
+    (self (tail l) (cons (head l) a)))))
 
 ;; Answers if first argument list is shorter than second argument list
 (define shorter? (lambda (x y)
@@ -132,4 +131,4 @@
 ;;; Your start-up code below (all definitions in this file are not redefinable):
 
 ;; Print beep character
-(define beep (lambda () (println '\)))
+(define beep (lambda () (println '\))) ; the byte after the backslash is a BEL
