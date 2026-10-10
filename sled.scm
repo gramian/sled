@@ -90,7 +90,7 @@
     (if (equiv? x (head l)) l
       (self x (tail l))))))
 
-;; Answers if either arguments are not NIL
+;; Answers if either argument is not NIL
 (define or? (lambda (x y)
   (if x true (if y true))))
 
@@ -118,11 +118,10 @@
         (cons (head l) (self x y (tail l))))
     (cons (cons x y) nil))))
 
-
 ;; Returns reverse of first argument list prepended to second argument list
-(define revpend (lambda (l a)
-  (if (empty? l) a
-    (self (tail l) (cons (head l) a)))))
+(define revpend (lambda (l . a)
+  (if (empty? l) (if a (head a))
+    (self (tail l) (cons (head l) (if a (head a)))))))
 
 ;; Answers if first argument list is shorter than second argument list
 (define shorter? (lambda (x y)
@@ -131,4 +130,4 @@
 ;;; Your start-up code below (all definitions in this file are not redefinable):
 
 ;; Print beep character
-(define beep (lambda () (println '\))) ; the byte after the backslash is a BEL
+(define beep (lambda () (print '\))) ; the byte after the backslash is a BEL

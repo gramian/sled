@@ -106,7 +106,7 @@ nil
 
 (check 'ver 'a (symbol? ver))
 
-(check 'ver 'b (equiv? ver 'sled-0.5))
+(check 'ver 'b (equiv? ver 'sled-0.6))
 
 (newline)
 
@@ -213,6 +213,18 @@ nil
 (check 'quote 'c (equal? '(a b) (cons 'a (cons 'b nil))))
 
 (check 'quote 'd (equiv? (head ''x) 'quote))
+
+(newline)
+
+;; value
+
+(check 'value 'a (equiv? (value 'ver) 'sled-0.6))
+
+(define aa 'x)
+
+(check 'value 'b (equiv? (value 'aa) 'x))
+
+(check 'value 'c (equiv? (let (dd 'z) (value 'dd)) 'z))
 
 (newline)
 
@@ -433,18 +445,6 @@ nil
 (check 'tail 'b (equiv? (tail '(x)) nil))
 
 (check 'tail 'c (equal? (tail '(x y)) '(y)))
-
-(newline)
-
-;; value
-
-(check 'value 'a (equiv? (value 'ver) 'sled-0.5))
-
-(define aa 'x)
-
-(check 'value 'b (equiv? (value 'aa) 'x))
-
-(check 'value 'c (equiv? (let (dd 'z) (value 'dd)) 'z))
 
 (newline)
 

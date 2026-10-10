@@ -1,6 +1,6 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.5) Features
+## Version (0.6) Features
 
 * Scheme-inspired
 * LISP Interpreter
@@ -11,11 +11,11 @@
 * Lexical Scoping
 * Mark & Sweep Garbage Collector
 * Trampoline Evaluator
-* ~1.1K Lines of Code (C89)
-* 8 Special Forms
+* ~1.3K Lines of Code (C89)
+* 9 Special Forms
 * 21 Builtin Functions
 * 21 Function Standard Library
-* 11K Executable
+* 13K Executable
 * Open-Source (0BSD)
 
 ## Table of Contents
@@ -27,14 +27,15 @@
 * [Index](#index)
 * [Usage](#usage)
 * [Links](#links)
+* [Extra](#extra)
 
 ## About
 
 SLED (**S**chemy **L**isp **e**n **D**OS) is a purely symbolic **LISP** (LISt
 Processor) with functionality (largely) inspired by **Scheme**. Originally
-derived from the fantastic [Kilo LISP](https://t3x.org/klisp), but reduced by
-some features (such as macros), and enhanced with others, SLED can be classified
-as an Ur-Lisp and runs on a **DOS** (Disk Operating System) such as
+derived from the fantastic [Kilo LISP](https://t3x.org/klisp), with some
+features (such as macros) removed, and enhanced with others, SLED can be
+classified as an Ur-Lisp and runs on a **DOS** (Disk Operating System) such as
 [FreeDOS](https://freedos.org) or MS-DOS, as well as on DOS-emulators like
 [DOSBox](https://dosbox.com), [DOSBox-X](https://dosbox-x.com), or
 [DOSBox-Staging](https://www.dosbox-staging.org).
@@ -42,7 +43,7 @@ For an overview of provided symbols, special forms, builtin functions, and
 standard library see the [index](#index).
 Get SLED:
 
-* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/download/v0.5/SLED-0_5.ZIP)
+* [Release Download (including compiled binary)](https://codeberg.org/gramian/sled/releases/latest)
 * [Source Code Repository](https://codeberg.org/gramian/sled)
 * [Backup Repository](https://github.com/gramian/sled)
 
@@ -59,9 +60,10 @@ representation of data and code. In Lisp, a list is enclosed by parentheses `(`,
 (begin lisp)
 ```
 
-If a list is representing code, its first element denotes the action (function),
-as in polish notation or verb-subject-object languages in general. Typically,
-Scheme LISP classifies as a functional programming language.
+If a list represents code, its first element denotes the action (function),
+as in Polish notation or verb-subject-object languages in general. LISP is such
+a computer language. Typically, Scheme LISP classifies as a functional
+programming language.
 
 ## Data
 
@@ -71,18 +73,19 @@ come in three variants: **Symbols**, **Closures** (functions), and some
 
 ### Symbols
 
-**Symbols** are unique names and consist of any combination of maximum 16 of
-the following forty characters:
+**Symbols** are unique names and consist of one to sixteen of the following
+forty characters:
 
 ```
 a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ - ? .
 ```
 
-where `.` cannot be the leading character.
+where an unescaped `.` cannot be the leading character.
 
-Additionally, any printable ASCII character can be part of a symbol when
-prefixed with the escape character `\` (backslash), with the exception of `(`,
-`)`, `'`, and `$`.
+Additionally, most ASCII character can be part of a symbol when prefixed with
+the escape character `\` (backslash), with the exception of `(`, `)`, `'`, and
+`$` which cannot be escaped. However, using printable ASCII characters for
+symbols is recommended.
 
 ```
 This\ is\ a\ sym\!
@@ -98,8 +101,7 @@ which means "empty list". See the [index](#index) for details.
 
 #### Quote
 
-A quote means "do not evaluate". Via the `quote` special form a symbol is
-registered:
+A quote means "do not evaluate" and is declared by the `quote` special form:
 
 ```
 (quote sym)
@@ -127,7 +129,7 @@ another `pair`. A pair can be created as data using the `.` (dot):
 '(a . x)
 ```
 
-or as result of the `cons` builtin function:
+or as the result of the `cons` builtin function:
 
 ```
 (cons 'a 'x)
@@ -154,7 +156,7 @@ A list can be created as data also by:
 '(a b)
 ```
 
-or as result of the (standard library) `list` function:
+or as the result of the (standard library) `list` function:
 
 ```
 (list 'a 'b)
@@ -162,7 +164,7 @@ or as result of the (standard library) `list` function:
 
 #### Improper List
 
-An improper list does not terminate by `nil`, for example:
+An improper list does not terminate in `nil`, for example:
 
 ```
 (a . (b . (c . d)))
@@ -199,7 +201,7 @@ The SLED system does not feature numeric types. Yet natural numbers
 ```
 
 These are tally numerals, so cardinality represents the magnitude, which is
-similar to von Neumann ordinals. The functions `inc`, `dec`, and `zero?`
+similar to unary tally numbers. The functions `inc`, `dec`, and `zero?`
 help with counting tasks.
 
 ## Code
@@ -216,8 +218,8 @@ Expressions can be evaluated, like:
 
 ### Bindings
 
-A binding links a symbol to some data payload, and is created via the `define`
-special form:
+A **binding** links a symbol to some data payload, and is created via the
+`define` special form:
 
 ```
 (define a 'x)
@@ -271,7 +273,7 @@ Additionally, TCO works for `cons` if the recursion runs in the second argument.
 
 An error during evaluation of an expression jumps back to the top-level, where
 an error occurrence can be tested. An error cannot be caught inside an
-expression.
+expression except for errors inside the `load` function.
 
 ### Builtin Functions
 
@@ -289,7 +291,8 @@ The standard library may be extended with additional custom definitions.
 Certain forms appear like functions but are not. These so-called special forms
 do not follow the function behavior, but use the same syntax as functions.
 For example, `if` does not evaluate its arguments before resolving the form.
-For details see the [index](#index).
+Furthermore, special forms must appear in the first position, and cannot neither
+be argument to `apply` nor aliased. For details see the [index](#index).
 
 ### Immutability
 
@@ -300,7 +303,7 @@ redefined.
 
 ## System
 
-This LISP system is a DOS application.
+The SLED LISP system is a DOS application.
 
 ### File Names
 
@@ -347,7 +350,7 @@ continues execution after an error occurs:
 C:\> sled /I code.scm
 ```
 
-The file path has to be the last argument.
+The file path has to be the last argument and extra arguments are ignored.
 
 ### File Path
 
@@ -406,6 +409,8 @@ The second is the `(exit)` builtin function, which upon evaluation exits:
 (exit)
 ```
 
+`quit` is an alias for `exit`.
+
 ### Comments
 
 Comments are ignored by the parser. A comment is introduced by a semicolon:
@@ -441,10 +446,11 @@ Parentheses inside a comment form need to be balanced:
 (comment ()   ; → error
 ```
 
-Note that a comment form cannot be quoted:
+Note that a comment form cannot be quoted directly:
 
 ```
-'(comment test)  ; → error
+'(comment test)           ; → error
+'(a (comment ignored) b)  ; (a b)
 ```
 
 ### Breaking
@@ -459,7 +465,7 @@ functions, and standard library symbols.
 
 ### Limits
 
-As real-mode DOS program, SLED has multiple constraints:
+As a real-mode DOS program, SLED has multiple constraints:
 
 * The heap has 12288 nodes
 * The symbol table has 4096 characters
@@ -470,11 +476,11 @@ The standard library consumes about 5% of nodes and characters.
 
 **Special Symbols**
 
-|                           |                 |               |
-|---------------------------|-----------------|---------------|
-| [`$`](#exit)              | [`?`](#help-1)  | [`'`](#quote) |
-| [`ans`](#ans)             | [`err`](#err)   | [`nil`](#nil) |
-| [`self`](#self-arg1-argn) | [`true`](#true) | [`ver`](#ver) |
+|                           |                 |                 |
+|---------------------------|-----------------|-----------------|
+| [`$`](#exit)              | [`?`](#help-1)  | [`'`](#quote-1) |
+| [`ans`](#ans)             | [`err`](#err)   | [`nil`](#nil)   |
+| [`self`](#self-arg1-argn) | [`true`](#true) | [`ver`](#ver)   |
 
 **Special Forms**
 
@@ -482,7 +488,7 @@ The standard library consumes about 5% of nodes and characters.
 |-------------------------------------|---------------------------------|-------------------------------------------|
 | [`begin`](#begin-body1-bodyn)       | [`comment`](#comment-arg1-argn) | [`define`](#define-sym-arg)               |
 | [`if`](#if-arg1-arg2-arg3)          | [`ifnil`](#ifnil-arg1-arg2)     | [`lambda`](#lambda-arg1-argn-body1-bodyn) |
-| [`let`](#let-arg1-arg2-body1-bodyn) | [`quote`](#quote-arg)           |                                           |
+| [`let`](#let-arg1-arg2-body1-bodyn) | [`quote`](#quote-arg)           | [`value`](#value-sym)                     |
 
 **Builtin Functions**
 
@@ -494,7 +500,7 @@ The standard library consumes about 5% of nodes and characters.
 | [`exit`](#exit-1)          | [`gc`](#gc-arg)              | [`head`](#head-arg)         |
 | [`load`](#load-sym-arg)    | [`newline`](#newline)        | [`print`](#print-arg1-argn) |
 | [`proc?`](#proc-arg)       | [`read`](#read)              | [`restart`](#restart-sym)   |
-| [`symbol?`](#symbol-arg)   | [`tail`](#tail-arg)          | [`value`](#value-sym)       |
+| [`scm`](#scm-arg1-argn)    | [`symbol?`](#symbol-arg)     | [`tail`](#tail-arg)         |
 
 **Standard Aliases**
 
@@ -520,14 +526,15 @@ The standard library consumes about 5% of nodes and characters.
 ### `$` {exit}
 
 This **special symbol** exits the REPL. This is **not** a short form of
-`(exit)`, as it is resolved by the parser. Works only from the prompt.
+`(exit)`, as it is resolved by the parser. In a loaded file it ends loading
+of that file, ignoring everything after it.
 
 ---
 
 ### `?` {help}
 
-This **special symbol** holds an overview of special forms, builtin functions,
-and the standard library. Works only from the prompt.
+This **special symbol** prints an overview of special forms, builtin functions,
+and the standard library. Works only from the REPL and precedes evaluation.
 
 ---
 
@@ -564,7 +571,7 @@ This **standard library** binary predicate answers if both arguments are not
 ### `ans`
 
 This **special symbol** contains the result of the last top-level form that
-produced a value; in case of an error, the `err` symbol is set, which can be
+produced a value; in case of an error, `ans` is set to `err`, which can be
 tested for with `error?`.
 
 ```
@@ -602,7 +609,8 @@ second argument list as arguments.
 ### `assert <arg> <sym>`
 
 This **standard library** binary procedure prints the second argument and causes
-an error, if the first argument evaluates to `nil`.
+an error, if the first argument evaluates to `nil`, otherwise the first argument
+is returned.
 
 ```
 (assert nil 'list\ empty)
@@ -649,7 +657,7 @@ Unlike the other special forms, this is decoded by the parser before evaluation.
 (comment this :-D is ignored)
 ```
 
-> **NOTE:** Parentheses inside comments have to be balanced.
+> **NOTE:** Parentheses inside `comment` have to be balanced.
 
 ---
 
@@ -776,7 +784,7 @@ Use to compare atoms.
 This **special symbol** marks an error state.
 
 ```
-(head nil)        ; → *error*
+(head nil)        ; → ? type
 (equiv? err ans)  ; → true
 ```
 
@@ -800,7 +808,7 @@ This **standard library** thunk predicate answers if the previous evaluation
 resulted in an error.
 
 ```
-(head nil)  ; → *error*
+(head nil)  ; → ? type
 (error?)    ; → true
 ```
 
@@ -1089,7 +1097,8 @@ This **builtin** variadic procedure prints its arguments to the standard output.
 ### `printid <arg1> [<arg2>]`
 
 This **standard library** function returns the first argument after printing
-it and a line break; if given, the second argument is printed before the first.
+it and a line break; if given, the second argument is printed before the first,
+followed by `: `.
 
 ```
 (printid '42 'answer)  ; → 42
@@ -1126,11 +1135,11 @@ function. For special forms, this predicate returns `nil`.
 
 ### `put <sym> <arg> <lst>`
 
-This **standard library** function returns an updated third argument association
-list by setting the tail of the pair with the first argument symbol as head, or
-adding a pair with the first argument symbol as head and the second argument as
-tail, if no pair with the first argument symbol as head is listed in the third
-argument.
+This **standard library** function returns a copy of the third argument
+association list but setting the tail of the first matching pair with the first
+argument symbol as head, or adding a pair with the first argument symbol as head
+and the second argument as tail, if no pair with the first argument symbol as
+head is listed in the third argument.
 
 ```
 (put 'hello 'world nil)               ; → ((hello . world))
@@ -1160,12 +1169,16 @@ This **special form** returns its argument unevaluated.
 
 ### `read`
 
-This **builtin** thunk returns a symbol read as a line of input from the
-keyboard terminated by a line break via return key / enter key.
+This **builtin** thunk reads one symbol of input from the keyboard terminated by
+a white space or line break via return key / enter key and returns it.
 
 ```
 (read)
 ```
+
+> **NOTE:** `read` prompts with `'` and reads one symbol from the keyboard - not
+            standard input. It re-prompts on empty or invalid input instead of
+            erroring and returns the `EOT` on `Ctrl+Z` (EOF).
 
 ---
 
@@ -1180,15 +1193,24 @@ loads a file specified by the symbol argument. All definitions are lost!
 
 ---
 
-### `revpend <lst1> <lst2>`
+### `revpend <lst1> [<lst2>]`
 
 This **standard library** binary function reverses its first argument list and
 appends the second argument list. Use also to reverse a list.
 
 ```
 (revpend (list 'a 'b 'c) '(d e))  ; → (c b a d e)
-(revpend (list 'a 'b 'c) nil)     ; → (c b a)
+(revpend (list 'a 'b 'c))         ; → (c b a)
 ```
+
+---
+
+### `scm <arg1> ... <argN>`
+
+This **builtin** function provides "super character mode" for low-resolution
+graphics programming.
+
+For details see the [`scm` documentation](#super-character-mode).
 
 ---
 
@@ -1202,6 +1224,8 @@ resolves to the enclosing `lambda`. Outside a `lambda`, `self` is undefined.
   (if (empty? x) nil
                  (self (tail x)))) (list nil nil))  ; → nil
 ```
+
+> **NOTE:** `self` always refers to the innermost `lambda`.
 
 ---
 
@@ -1251,21 +1275,21 @@ true  ; → true
 
 ### `value <sym>`
 
-This **builtin** unary function resolves the value of its symbol argument.
-Respects lexical scope.
+This **special form** evaluates its argument, which must yield a symbol, and
+returns that symbol's value. Respects lexical scope.
 
 ```
-(value 'ver)  ; → sled-0.5
+(value 'ver)  ; → sled-0.6
 ```
 
 ---
 
 ### `ver`
 
-This **special symbol** evaluates to a symbol pinpointing the version of SLED.
+This **special symbol** evaluates to a symbol identifying the version of SLED.
 
 ```
-ver  ; → sled-0.5
+ver  ; → sled-0.6
 ```
 
 ---
@@ -1286,10 +1310,11 @@ This is a **standard alias** for `empty?`; use for testing tally numbers.
 * No libc, all I/O goes through `int 21h` directly
 * Uses real mode "small memory model" (64K data segment and 64K code segment)
 * Minimally, a 286 CPU with 256K RAM should be sufficient
-* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, MacOS, or Unix
+* Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, macOS, or Unix
+* Some sample code is in the `demo` folder; for example, run `(load 'demo\\fractal.scm)`
 * Building SLED requires [Microsoft C Compiler](https://github.com/davidly/dos_compilers) or [Open Watcom](https://github.com/open-watcom/open-watcom-v2), as well as `make`
 * Build with MS C 6.0A: `make build_msc` (Compiler location via `MSC`)
-* Build with Open Watcom V2: `make build_owc` (Compiler location via `OWC`)
+* Build with Open Watcom v2: `make build_owc` (Compiler location via `OWC`)
 * Run build: `make run`
 * Run tests: `make tests`
 * Run benchmark: `make bench` (Takeuchi function, see [this](https://archive.org/details/AcornUser047-Jun86/page/n179/mode/2up) and [that](https://archive.org/details/AcornUser052-Nov86/page/n197/mode/2up))
@@ -1309,6 +1334,195 @@ This is a **standard alias** for `empty?`; use for testing tally numbers.
 * [Free Lisp development environments for DOS](https://web.archive.org/web/20251225014422/https://www.streetinfo.lu/computing/programming/dos/dos_lisp.html)
 
 * [S-expressions](https://web.archive.org/web/20251011064346/https://www.s-expressions.org/home)
+
+## Extra
+
+### Super Character Mode
+
+SCM (Super Character Mode) is a graphics extension for SLED and is meant for
+DOS (event-driven) game development. SCM is inspired by C64's
+[standard character mode](https://www.c64-wiki.com/wiki/Standard_Character_Mode),
+uses BIOS video and keyboard services, and writes to video memory directly.
+
+* SCM provides pixel graphics in 80x48@16 (80 by 48 pixels at 16 colors).
+* This builtin extension uses text mode 3 (80x25@16),
+* which requires EGA or VGA,
+* and needs to be set before starting SLED (DOS default video mode).
+* Using extended ASCII (CP437) character 223 `▀` (upper half block),
+* each text row becomes two rows of pixels:
+* the foreground color sets the upper pixel,
+* the background color sets the lower pixel.
+* The screen's bottom row is excluded and can be used as a status text line.
+* A restart of SLED also resets the SCM extension.
+
+#### Color Palette
+
+The color palette is the default 16 EGA colors:
+
+| Hex | Color          | RGB       | Pixel                                 |
+|:---:|----------------|-----------|:-------------------------------------:|
+|   0 | Black          | `#000000` | <span style="color:#000000">██</span> |
+|   1 | Blue           | `#0000AA` | <span style="color:#0000AA">██</span> |
+|   2 | Green          | `#00AA00` | <span style="color:#00AA00">██</span> |
+|   3 | Cyan           | `#00AAAA` | <span style="color:#00AAAA">██</span> |
+|   4 | Red            | `#AA0000` | <span style="color:#AA0000">██</span> |
+|   5 | Magenta        | `#AA00AA` | <span style="color:#AA00AA">██</span> |
+|   6 | Brown          | `#AA5500` | <span style="color:#AA5500">██</span> |
+|   7 | Light Gray     | `#AAAAAA` | <span style="color:#AAAAAA">██</span> |
+|   8 | Dark Gray      | `#555555` | <span style="color:#555555">██</span> |
+|   9 | Bright Blue    | `#5555FF` | <span style="color:#5555FF">██</span> |
+|   A | Bright Green   | `#55FF55` | <span style="color:#55FF55">██</span> |
+|   B | Bright Cyan    | `#55FFFF` | <span style="color:#55FFFF">██</span> |
+|   C | Bright Red     | `#FF5555` | <span style="color:#FF5555">██</span> |
+|   D | Bright Magenta | `#FF55FF` | <span style="color:#FF55FF">██</span> |
+|   E | Yellow         | `#FFFF55` | <span style="color:#FFFF55">██</span> |
+|   F | White          | `#FFFFFF` | <span style="color:#FFFFFF">██</span> |
+
+#### `hex` Image File Format
+
+* SCM reads images in the `hex`-format.
+* A `.hex` file is a plain text file.
+* It consists of lines of text of the same length,
+* each character corresponds to a pixel,
+* allowed characters: `0`,`1`,`2`,`3`,`4`,`5`,`6`,`7`,`8`,`9`,`A`,`B`,`C`,`D`,`E`,`F`,
+* in particular only uppercase letters for A-F,
+* and `.` for a transparent pixel.
+* All lines need to have the same length.
+* Maximum size is 80x48.
+* Blank lines are ignored.
+
+Example image:
+
+```
+........
+..EEEE..
+.ECEECE.
+.EEEEEE.
+.E0EE0E.
+.EE00EE.
+..EEEE..
+........
+```
+
+#### Edge Stacking
+
+* The `draw` command draws to the double buffer (an offscreen area in VRAM).
+* An image can be drawn to the left, right, top, bottom edge, or to the center;
+* in any case the image is centered with respect to the edge.
+* Images are clipped against the screen edges,
+* and may optionally be horizontally flipped.
+* Images stack inwards,
+* so the next image drawn to the same edge is offset by the width or height of the previous.
+* The stack front can be reset manually (`reset` command),
+* or is reset when flushed to screen (`show` command).
+* Drawing to the center does not change edge stacks.
+
+#### Double Buffering
+
+* The `show` command renders to the screen.
+* Images are drawn to the double buffer.
+* The double buffer is then flushed to the screen buffer.
+* The screen buffer is text page 0 (`B800:0000`),
+* the double buffer starts on text page 1 (`B800:1000`),
+* the offscreen buffer then starts at `B800:1F00` and is 24K.
+
+#### Status Row
+
+* The bottom row can be used for printing text.
+* Avoid using `newline`, as that would scroll the screen.
+* The status row can use 79 characters before scrolling.
+
+#### Key Polling
+
+The `key` command waits for one of the following keys to be pressed:
+
+| Key         | Symbol |
+|-------------|--------|
+| Escape      |  `es`  |
+| Enter       |  `en`  |
+| Up-Arrow    |  `up`  |
+| Down-Arrow  |  `dn`  |
+| Left-Arrow  |  `lt`  |
+| Right-Arrow |  `rt`  |
+| z           |  `b1`  |
+| x           |  `b2`  |
+
+#### Commands
+
+|                                         |                         |                                    |
+|-----------------------------------------|-------------------------|------------------------------------|
+| [`scm 'draw`](#scm-draw-sym1-sym2-sym3) | [`scm 'key`](#scm-key)  | [`scm 'load`](#scm-load-sym1-sym2) |
+| [`scm 'reset`](#scm-reset)              | [`scm 'set?`](#scm-set) | [`scm 'show`](#scm-show)           |
+
+---
+
+##### `scm 'draw <sym1> <sym2> [<sym3>]`
+
+This **scm** command draws a loaded image identified by the first symbol argument
+to the double buffer. It is stacked on the left (`'l`), right (`'r`),
+top (`'t`), bottom (`'b`), or centered (`'c`) specified by the second symbol
+argument, and optionally flipped via a non-`nil` third symbol argument. On
+success `nil` is returned.
+
+```
+(scm 'draw 'img 'c)  ; → nil
+```
+
+---
+
+##### `scm 'key`
+
+This **scm** command waits for one of eight keys and returns an associated symbol:
+"Escape" `'es`, "Enter", `'en`, "Up" `'up`, "Down" `'dn`, "Left" `'lt`,
+"Right" `'rt`, "z", `'b1`, "x", `'b2`.
+
+```
+(scm 'key)  ; → es
+```
+
+---
+
+##### `scm 'load <sym1> <sym2>`
+
+This **scm** command loads an image with the file path and associates the second
+symbol argument to the symbol in the first argument. On success `nil` is
+returned.
+
+```
+(scm 'load 'img 'img.hex)  ; → nil
+```
+
+---
+
+##### `scm 'reset`
+
+This **scm** command resets the edge counters.
+
+```
+(scm 'reset)  ; → nil
+```
+
+---
+
+##### `scm 'set?`
+
+This **scm** command answers if the required text mode is set. Use to detect if
+`scm` is available and ready.
+
+```
+(scm 'set?)  ; → true
+```
+
+---
+
+##### `scm 'show`
+
+This **scm** command copies the double buffer to the screen buffer. Also the edge
+counters are reset, the double buffer is cleared, page 0 is set, and the cursor is set to row 24.
+
+```
+(scm 'show)  ; → nil
+```
 
 ---
 

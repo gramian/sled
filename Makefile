@@ -26,7 +26,7 @@ build_msc:
 		-c "set PATH=C:\BIN;C:\BINB" \
 		-c "set INCLUDE=C:\INCLUDE" \
 		-c "set LIB=C:\LIB" \
-		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 $(SRC) /link /NOE /STACK:$(STK) > BUILD.LOG" \
+		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 /DSCM $(SRC) /link /NOE /STACK:$(STK) > BUILD.LOG" \
 		-c "exit"
 	cat BUILD.LOG
 	ls -lS $(OUT)
@@ -36,21 +36,21 @@ build_owc:
 		-c "mount c $(OWC)" \
 		-c "set WATCOM=C:\ " \
 		-c "set PATH=C:\BINW" \
-		-c "wcl /ms /fe=$(OUT) /l=dos /w2 /ox /zp=2 /2 $(SRC) /k$(STK) > BUILD.LOG" \
+		-c "wcl /ms /fe=$(OUT) /l=dos /w2 /ox /zp=2 /2 /dSCM $(SRC) /k$(STK) > BUILD.LOG" \
 		-c "exit"
 	cat BUILD.LOG
 	ls -lS $(OUT)
 
 tests:
 	$(call dosbox,25000) \
-		-c "$(OUT) /I tests.scm > TESTS.LOG" \
+		-c "$(OUT) /I demo\tests.scm > TESTS.LOG" \
 		-c "exit"
 	cat TESTS.LOG
 
 bench:
 	$(call dosbox,25000) \
 		-c "time > BENCH.LOG" \
-		-c "$(OUT) /B bench.scm >> BENCH.LOG" \
+		-c "$(OUT) /B demo\tak.scm >> BENCH.LOG" \
 		-c "time >> BENCH.LOG" \
 		-c "exit"
 	cat BENCH.LOG
