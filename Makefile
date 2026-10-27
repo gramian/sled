@@ -55,6 +55,10 @@ bench:
 		-c "exit"
 	cat BENCH.LOG
 
+demos:
+	$(call dosbox,25000) \
+		-c "demo.bat"
+
 run:
 	$(call dosbox,25000) \
 		-c "$(OUT)"

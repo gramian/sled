@@ -10,3 +10,7 @@
      (if (equiv? (head p) 'f)  (self (tail p) nil (cons q r))
          (error '(bad _ command) (head p))))))
    p nil nil)))
+
+(define test '(\+ \+ \+ f \+ f))
+
+(println test _ '-\> _ (pipe test))

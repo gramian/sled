@@ -1,0 +1,35 @@
+! XPM2
+16 16 17 1
+0 c #000000
+1 c #0000AA
+2 c #00AA00
+3 c #00AAAA
+4 c #AA0000
+5 c #AA00AA
+6 c #AA5500
+7 c #AAAAAA
+8 c #555555
+9 c #5555FF
+A c #55FF55
+B c #55FFFF
+C c #FF5555
+D c #FF55FF
+E c #FFFF55
+F c #FFFFFF
+. c None
+FFFFFFFFFFFFFFFF
+F..............F
+F.FFFFFFFFFFFF.F
+F.F..........F.F
+F.F.FFFFFFFF.F.F
+F.F.F......F.F.F
+F.F.F.FFFF.F.F.F
+F.F.F.F..F.F.F.F
+F.F.F.FF.F.F.F.F
+F.F.F....F.F.F.F
+F.F.FFFFFF.F.F.F
+F.F........F.F.F
+F.FFFFFFFFFF.F.F
+F............F.F
+FFFFFFFFFFFFFF.F
+...............F

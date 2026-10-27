@@ -106,7 +106,7 @@ nil
 
 (check 'ver 'a (symbol? ver))
 
-(check 'ver 'b (equiv? ver 'sled-0.6))
+(check 'ver 'b (equiv? ver 'sled-0.7))
 
 (newline)
 
@@ -218,7 +218,7 @@ nil
 
 ;; value
 
-(check 'value 'a (equiv? (value 'ver) 'sled-0.6))
+(check 'value 'a (equiv? (value 'ver) 'sled-0.7))
 
 (define aa 'x)
 
@@ -262,11 +262,13 @@ nil
 
 ;; cons
 
-(check 'cons 'a  (equal? (cons 'a 'b) '(a . b)))
+(check 'cons 'a (equal? (cons 'a 'b) '(a . b)))
 
-(check 'cons 'b  (equal? (cons 'a nil) '(a)))
+(check 'cons 'b (equal? (cons 'a nil) '(a)))
 
-(check 'cons 'c  (equal? (cons 'a (cons 'b nil)) '(a b)))
+(check 'cons 'c (equal? (cons 'a (cons 'b nil)) '(a b)))
+
+(check 'cons 'd (not (equiv? (cons 'x 'y) (cons 'x 'y))))
 
 (newline)
 

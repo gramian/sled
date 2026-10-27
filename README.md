@@ -1,6 +1,6 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.6) Features
+## Version (0.7) Features
 
 * Scheme-inspired
 * LISP Interpreter
@@ -8,15 +8,15 @@
 * in 16-bit Real Mode
 * Small Memory Model
 * Tail-Call Optimization
-* Lexical Scoping
 * Mark & Sweep Garbage Collector
 * Trampoline Evaluator
-* ~1.3K Lines of Code (C89)
+* ~1.1K Lines of Code (C89)
+* Open-Source (0BSD)
 * 9 Special Forms
 * 21 Builtin Functions
 * 21 Function Standard Library
+* 80x48@16 Graphics Extension
 * 13K Executable
-* Open-Source (0BSD)
 
 ## Table of Contents
 
@@ -36,7 +36,8 @@ Processor) with functionality (largely) inspired by **Scheme**. Originally
 derived from the fantastic [Kilo LISP](https://t3x.org/klisp), with some
 features (such as macros) removed, and enhanced with others, SLED can be
 classified as an Ur-Lisp and runs on a **DOS** (Disk Operating System) such as
-[FreeDOS](https://freedos.org) or MS-DOS, as well as on DOS-emulators like
+[FreeDOS](https://freedos.org), [DR DOS](https://www.dr-dos.com), or
+[MS-DOS](https://en.wikipedia.org/wiki/MS-DOS), as well as on DOS-emulators like
 [DOSBox](https://dosbox.com), [DOSBox-X](https://dosbox-x.com), or
 [DOSBox-Staging](https://www.dosbox-staging.org).
 For an overview of provided symbols, special forms, builtin functions, and
@@ -167,19 +168,20 @@ or as the result of the (standard library) `list` function:
 An improper list does not terminate in `nil`, for example:
 
 ```
-(a . (b . (c . d)))
+'(a . (b . (c . d)))
 ```
 
 #### Association List
 
-An association list is a list where each element is a pair (association):
+An association list (alist) is a list where each element is a pair
+(association):
 
 ```
-((a . x) (b . y) (c . z))
+'((a . x) (b . y) (c . z))
 ```
 
 The head part of such a pair element is called **key** and the tail is called
-**value**.
+**value**. Alists can also be used as structures.
 
 ### S-Expressions
 
@@ -212,7 +214,7 @@ In LISP, unquoted data is evaluated as code.
 
 Expressions can be evaluated, like:
 
-* Bindings
+* Symbols (evaluating to bindings)
 * Functions
 * Special Forms
 
@@ -261,6 +263,12 @@ This means the function parameters can be set up in various ways:
 
 Optional arguments can be passed as a list, like `z` above.
 
+### Scope
+
+There are two types of bindings: local and global. Local bindings such as
+arguments or `let`-bindings have lexical scope. Global bindings are
+`define`-bindings have no scope, wherever they appear they take precedence.
+
 ### Recursion
 
 LISPs rely on recursion instead of iteration. Recursion refers to a function
@@ -273,7 +281,11 @@ Additionally, TCO works for `cons` if the recursion runs in the second argument.
 
 An error during evaluation of an expression jumps back to the top-level, where
 an error occurrence can be tested. An error cannot be caught inside an
-expression except for errors inside the `load` function.
+expression except for errors inside the `load` function, where `err` is
+returned. Other errors abort the whole top-level form.
+
+An error message is prefixed with a question mark: `? message[: form]`. A fatal
+error prints a message prefixed with an exclamation mark: `! fatal[: message]`.
 
 ### Builtin Functions
 
@@ -291,15 +303,15 @@ The standard library may be extended with additional custom definitions.
 Certain forms appear like functions but are not. These so-called special forms
 do not follow the function behavior, but use the same syntax as functions.
 For example, `if` does not evaluate its arguments before resolving the form.
-Furthermore, special forms must appear in the first position, and cannot neither
-be argument to `apply` nor aliased. For details see the [index](#index).
+Furthermore, special forms must appear in the first position, and cannot be
+argument to `apply` or aliased. For details see the [index](#index).
 
 ### Immutability
 
 Special symbols, special forms, builtin functions, and standard library contents
 are immutable in SLED. Furthermore, special forms and builtin functions cannot
-be shadowed. Standard library and adjacent custom definitions cannot be
-redefined.
+be shadowed. Standard library and adjacent custom definitions in `sled.scm`
+cannot be redefined.
 
 ## System
 
@@ -409,7 +421,7 @@ The second is the `(exit)` builtin function, which upon evaluation exits:
 (exit)
 ```
 
-`quit` is an alias for `exit`.
+Also, `quit` is an alias for `exit`.
 
 ### Comments
 
@@ -1195,8 +1207,8 @@ loads a file specified by the symbol argument. All definitions are lost!
 
 ### `revpend <lst1> [<lst2>]`
 
-This **standard library** binary function reverses its first argument list and
-appends the second argument list. Use also to reverse a list.
+This **standard library** function reverses its first argument list and appends
+the second argument list. Use also to reverse a list.
 
 ```
 (revpend (list 'a 'b 'c) '(d e))  ; → (c b a d e)
@@ -1279,7 +1291,7 @@ This **special form** evaluates its argument, which must yield a symbol, and
 returns that symbol's value. Respects lexical scope.
 
 ```
-(value 'ver)  ; → sled-0.6
+(value 'ver)  ; → sled-0.7
 ```
 
 ---
@@ -1289,7 +1301,7 @@ returns that symbol's value. Respects lexical scope.
 This **special symbol** evaluates to a symbol identifying the version of SLED.
 
 ```
-ver  ; → sled-0.6
+ver  ; → sled-0.7
 ```
 
 ---
@@ -1305,18 +1317,19 @@ This is a **standard alias** for `empty?`; use for testing tally numbers.
 
 ## Usage
 
-* SLED is made for a disk operating system like **FreeDOS** or **MS-DOS** (>=3)
+* SLED is made for a disk operating system like **FreeDOS**, **DR DOS** or **MS-DOS** (>=3)
 * Outside DOS, a DOS emulator like **DOSBox**, **DOSBox-X**, **DOSBox-Staging** is required
-* No libc, all I/O goes through `int 21h` directly
+* No libc, all standard I/O goes through `int 21h` directly (SCM, uses `int 10h` and `int 16h`)
 * Uses real mode "small memory model" (64K data segment and 64K code segment)
 * Minimally, a 286 CPU with 256K RAM should be sufficient
 * Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, macOS, or Unix
-* Some sample code is in the `demo` folder; for example, run `(load 'demo\\fractal.scm)`
+* Redirected input, i.e. `sled < script.scm`, works (`read` still reads from the keyboard)
 * Building SLED requires [Microsoft C Compiler](https://github.com/davidly/dos_compilers) or [Open Watcom](https://github.com/open-watcom/open-watcom-v2), as well as `make`
 * Build with MS C 6.0A: `make build_msc` (Compiler location via `MSC`)
 * Build with Open Watcom v2: `make build_owc` (Compiler location via `OWC`)
 * Run build: `make run`
 * Run tests: `make tests`
+* Run demos: `make demos`
 * Run benchmark: `make bench` (Takeuchi function, see [this](https://archive.org/details/AcornUser047-Jun86/page/n179/mode/2up) and [that](https://archive.org/details/AcornUser052-Nov86/page/n197/mode/2up))
 
 ## Links
@@ -1359,24 +1372,24 @@ uses BIOS video and keyboard services, and writes to video memory directly.
 
 The color palette is the default 16 EGA colors:
 
-| Hex | Color          | RGB       | Pixel                                 |
-|:---:|----------------|-----------|:-------------------------------------:|
-|   0 | Black          | `#000000` | <span style="color:#000000">██</span> |
-|   1 | Blue           | `#0000AA` | <span style="color:#0000AA">██</span> |
-|   2 | Green          | `#00AA00` | <span style="color:#00AA00">██</span> |
-|   3 | Cyan           | `#00AAAA` | <span style="color:#00AAAA">██</span> |
-|   4 | Red            | `#AA0000` | <span style="color:#AA0000">██</span> |
-|   5 | Magenta        | `#AA00AA` | <span style="color:#AA00AA">██</span> |
-|   6 | Brown          | `#AA5500` | <span style="color:#AA5500">██</span> |
-|   7 | Light Gray     | `#AAAAAA` | <span style="color:#AAAAAA">██</span> |
-|   8 | Dark Gray      | `#555555` | <span style="color:#555555">██</span> |
-|   9 | Bright Blue    | `#5555FF` | <span style="color:#5555FF">██</span> |
-|   A | Bright Green   | `#55FF55` | <span style="color:#55FF55">██</span> |
-|   B | Bright Cyan    | `#55FFFF` | <span style="color:#55FFFF">██</span> |
-|   C | Bright Red     | `#FF5555` | <span style="color:#FF5555">██</span> |
-|   D | Bright Magenta | `#FF55FF` | <span style="color:#FF55FF">██</span> |
-|   E | Yellow         | `#FFFF55` | <span style="color:#FFFF55">██</span> |
-|   F | White          | `#FFFFFF` | <span style="color:#FFFFFF">██</span> |
+| Hex | Color          | RGB       |
+|:---:|----------------|-----------|
+|   0 | Black          | `#000000` |
+|   1 | Blue           | `#0000AA` |
+|   2 | Green          | `#00AA00` |
+|   3 | Cyan           | `#00AAAA` |
+|   4 | Red            | `#AA0000` |
+|   5 | Magenta        | `#AA00AA` |
+|   6 | Brown          | `#AA5500` |
+|   7 | Light Gray     | `#AAAAAA` |
+|   8 | Dark Gray      | `#555555` |
+|   9 | Bright Blue    | `#5555FF` |
+|   A | Bright Green   | `#55FF55` |
+|   B | Bright Cyan    | `#55FFFF` |
+|   C | Bright Red     | `#FF5555` |
+|   D | Bright Magenta | `#FF55FF` |
+|   E | Yellow         | `#FFFF55` |
+|   F | White          | `#FFFFFF` |
 
 #### `hex` Image File Format
 
@@ -1436,16 +1449,16 @@ Example image:
 
 The `key` command waits for one of the following keys to be pressed:
 
-| Key         | Symbol |
-|-------------|--------|
-| Escape      |  `es`  |
-| Enter       |  `en`  |
-| Up-Arrow    |  `up`  |
-| Down-Arrow  |  `dn`  |
-| Left-Arrow  |  `lt`  |
-| Right-Arrow |  `rt`  |
-| z           |  `b1`  |
-| x           |  `b2`  |
+| Key           | Symbol |
+|---------------|--------|
+| Escape        |  `es`  |
+| Enter         |  `en`  |
+| Up-Arrow      |  `up`  |
+| Down-Arrow    |  `dn`  |
+| Left-Arrow    |  `lt`  |
+| Right-Arrow   |  `rt`  |
+| z (US layout) |  `b1`  |
+| x (US layout) |  `b2`  |
 
 #### Commands
 
@@ -1484,13 +1497,17 @@ This **scm** command waits for one of eight keys and returns an associated symbo
 
 ##### `scm 'load <sym1> <sym2>`
 
-This **scm** command loads an image with the file path and associates the second
-symbol argument to the symbol in the first argument. On success `nil` is
-returned.
+This **scm** command loads an image with the file path in the second symbol
+argument and associates it to the symbol in the first argument. On success `nil`
+is returned.
 
 ```
 (scm 'load 'img 'img.hex)  ; → nil
 ```
+
+> **NOTE:** `scm 'load` can load [XPM2](https://en.wikipedia.org/wiki/X_PixMap#XPM2)
+            image files where the header can be skipped but the pixel data
+            conforms to the `.hex` file format.
 
 ---
 
@@ -1506,12 +1523,16 @@ This **scm** command resets the edge counters.
 
 ##### `scm 'set?`
 
-This **scm** command answers if the required text mode is set. Use to detect if
-`scm` is available and ready.
+This **scm** command returns `true` if `scm` is available and ready. If the
+wrong video mode is set an error is raised, if `scm` is not builtin `nil` is
+returned.
 
 ```
 (scm 'set?)  ; → true
 ```
+
+> **NOTE:** `scm` requires video mode 3 (DOS EGA/VGA default) is set before
+            `SLED` is started (if needed via `MODE CO80`).
 
 ---
 

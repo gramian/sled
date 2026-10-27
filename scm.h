@@ -20,15 +20,15 @@
 #define SCM_POOL    (SCM_DOUBLE + SCM_W * SCM_H)          // Offscreen Image pool
 
 #define SCM_MODE    (*(volatile byte _far*) 0x00400049L)  // BIOS video mode
-#define SCM_COLS    (*(volatile unsigned int _far*) 0x0040004AL)  // EGA/VGA cols
+#define SCM_COLS    (*(volatile uint _far*) 0x0040004AL)  // EGA/VGA cols
 #define SCM_ROWS    (*(volatile byte _far*) 0x00400084L)  // EGA/VGA rows - 1
 
 // State #######################################################################
 
 struct {
-    bool errored;        // error flag
-    unsigned int top;    // image pool fill level
-    int l, t, r, b;      // edge stacking depth
+    bool errored;     // error flag
+    uint top;         // image pool fill level
+    sint l, t, r, b;  // edge stacking depth
 } Scm;
 
 // Fail the current command with message (NONE when already reported)
@@ -37,14 +37,14 @@ struct {
 // BIOS ########################################################################
 
 // Scan code of the next key without waiting
-int _cdecl scm_poll(void) {
-    unsigned int k = 0xFFFF;  // no key (not a real value)
+sint _cdecl scm_poll(void) {
+    uint k = 0xFFFF;  // no key (not a real value)
     _asm {
         mov ah, 1
-        int 16h               // ZF set: no key waiting
+        int 16h       // ZF set: no key waiting
         jz done
         xor ah, ah
-        int 16h               // AH: scan code, AL: character
+        int 16h       // AH: scan code, AL: character
         mov k, ax
         done:
     }
@@ -111,26 +111,26 @@ const char* scm_key(void) {
 byte _far* scm_find(const char* s) {
     byte _far* p = SCM_POOL;
     byte _far* q = SCM_POOL + Scm.top;
-    unsigned int n;
+    uint n;
     if (!*s) return NONE;
     n = s - Symtab;
     for (; p < q; p += SCM_HDR + (p[SCM_WID] * p[SCM_HGT]))
-        if (*(unsigned int _far*) p == n) return p;
+        if (*(uint _far*) p == n) return p;
     return NONE;
 }
 
 // Load hex file with name into image pool
 const char* scm_load(const char* s, const char* f) {
     static const char Imagesize[] = "image size";
-    byte _far* p = SCM_POOL + Scm.top;           // header of the new image
-    unsigned int i = SCM_HDR;                    // start of pixels
+    byte _far* p = SCM_POOL + Scm.top;  // header of the new image
+    uint i = SCM_HDR;                   // start of pixels
     const char* e = NONE;
-    int c, k, w = 0, h = 0, x = 0;
+    sint c, k, w = 0, h = 0, x = 0;
 
     if (!*s) return scm_fail("missing name");
     if (!*f) return scm_fail("missing file");
     if (scm_find(s)) return scm_fail("name taken");
-    if (!iopush(f)) return scm_fail(NONE);       // iopush reported the error
+    if (!iopush(f)) return scm_fail(NONE);  // iopush reported the error
     do {
         c = read_char();
         if ((c == '\r') || (c == '\n') || (c == EOT)) {  // end of row (CRLF gives a blank row, skipped)
@@ -140,6 +140,10 @@ const char* scm_load(const char* s, const char* f) {
                 if ((x != w) || (h > SCM_H)) e = Imagesize;
                 x = 0;
             }
+        } else if ((x < 3) && ((c == ' ') || (c == '!'))) {  // drop XPM2 header lines
+            i -= x;
+            x = 0;
+            while ((c != '\n') && (c != EOT)) c = read_char();
         } else {
             k = ((c >= '0') && (c <= '9')) ? c - '0' :
             ((c >= 'A') && (c <= 'F')) ? c - 'A' + 10 :
@@ -155,7 +159,7 @@ const char* scm_load(const char* s, const char* f) {
     if (!e && !h) e = Imagesize;
     if (e) return scm_fail(e);
 
-    *(unsigned int _far*) p = s - Symtab;  // write header
+    *(uint _far*) p = s - Symtab;  // write header
     p[SCM_WID] = (byte) w;
     p[SCM_HGT] = (byte) h;
     Scm.top += i;
@@ -174,8 +178,8 @@ const char* scm_reset(void) {
 
 // Clear double buffer
 void scm_clear(void) {
-    unsigned int _far* d = (unsigned int _far*) SCM_DOUBLE;
-    unsigned int i;
+    uint _far* d = (uint _far*) SCM_DOUBLE;
+    uint i;
     for (i = SCM_W * SCM_H / 2; i; i--) *d++ = 0;
     scm_reset();
 }
@@ -183,8 +187,8 @@ void scm_clear(void) {
 // Stack image centered (on edge t, b, l, r, or centered c) in off-screen buffer
 const char* scm_draw(const char* s, const char* e, const char* m) {
     byte _far* p = scm_find(s);
-    int w, h, x, y, c0, r0, n, r, c, k, pskip, iskip, dx = 1;
-    unsigned int i;
+    sint w, h, x, y, c0, r0, n, r, c, k, pskip, iskip, dx = 1;
+    uint i;
 
     if (!p) return scm_fail("not loaded");
     w = p[SCM_WID];
@@ -223,12 +227,12 @@ const char* scm_draw(const char* s, const char* e, const char* m) {
 
 // Flush off-screen buffer to screen: two pixel rows per text row
 const char* scm_show(void) {
-    volatile unsigned int _far* v = (volatile unsigned int _far*) SCM_SCREEN;
+    volatile uint _far* v = (volatile uint _far*) SCM_SCREEN;
     byte _far* p = SCM_DOUBLE;                 // top pixel of the current cell
-    unsigned int r, c;
+    uint r, c;
     for (r = SCM_H / 2; r; r--, p += SCM_W)    // skip the bottom pixel row
         for (c = SCM_W; c; c--, p++)           // foreground: top, background: bottom
-            *v++ = ((unsigned int) p[SCM_W] << 12) | ((unsigned int) *p << 8) | SCM_PIXEL;
+            *v++ = ((uint) p[SCM_W] << 12) | ((uint) *p << 8) | SCM_PIXEL;
     for (c = SCM_W; c; c--) *v++ = SCM_BLANK;  // status row
     scm_cursor();
     Fresh = TRUE;
@@ -262,7 +266,7 @@ node scm(node x) {
     const char* a[4];
     const char* r;
     node p, s;
-    int i = 0;
+    sint i = 0;
     SYNTAX_IF(x, 1, 4);
     a[1] = a[2] = a[3] = "";
     for (p = cdr(x); p != NIL; p = cdr(p)) {
