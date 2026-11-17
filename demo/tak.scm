@@ -2,7 +2,7 @@
 
 ;; Returns last argument via Takeuchi function
 (define tak (lambda (x y z)
-  (if (shorter? y x)
+  (if (drop y x)
       (self (self (tail x) y z)
             (self (tail y) z x)
             (self (tail z) x y))

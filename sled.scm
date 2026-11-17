@@ -44,6 +44,10 @@
 (define dec (lambda (x)
   (if x (tail x))))
 
+;; Returns tail of second argument list exceeding length of first argument list
+(define drop (lambda (x y)
+  (if y (if x (self (tail x) (tail y)) y))))
+
 ;; Answers if arguments are recursively equal
 (define equal? (lambda (x y)
   (ifnil (equiv? x y)
@@ -99,8 +103,8 @@
   (if (atom? x) nil true)))
 
 ;; Returns first argument after printing (optional second) first argument
-(define printid (lambda (x . y)
-  (if y (print (head y) '\:\ ))
+(define printid (lambda (x y)
+  (if y (print y '\:\ ))
   (print x)
   (newline)
   x))
@@ -119,13 +123,9 @@
     (cons (cons x y) nil))))
 
 ;; Returns reverse of first argument list prepended to second argument list
-(define revpend (lambda (l . a)
-  (if (empty? l) (if a (head a))
-    (self (tail l) (cons (head l) (if a (head a)))))))
-
-;; Answers if first argument list is shorter than second argument list
-(define shorter? (lambda (x y)
-  (if y (if x (self (tail x) (tail y)) true))))
+(define revpend (lambda (l a)
+  (if (empty? l) a
+    (self (tail l) (cons (head l) a)))))
 
 ;;; Your start-up code below (all definitions in this file are not redefinable):
 

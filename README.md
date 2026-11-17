@@ -1,6 +1,6 @@
 # SLED - Schemy LISP en DOS
 
-## Version (0.7) Features
+## Version (0.8) Features
 
 * Scheme-inspired
 * LISP Interpreter
@@ -83,7 +83,7 @@ a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ - ? .
 
 where an unescaped `.` cannot be the leading character.
 
-Additionally, most ASCII character can be part of a symbol when prefixed with
+Additionally, most ASCII characters can be part of a symbol when prefixed with
 the escape character `\` (backslash), with the exception of `(`, `)`, `'`, and
 `$` which cannot be escaped. However, using printable ASCII characters for
 symbols is recommended.
@@ -262,12 +262,18 @@ This means the function parameters can be set up in various ways:
 ```
 
 Optional arguments can be passed as a list, like `z` above.
+Missing arguments are set to `nil`, which makes recursive function definition
+more comfortable.
+
+```
+(map f)  ; → (map f nil) → nil
+```
 
 ### Scope
 
 There are two types of bindings: local and global. Local bindings such as
 arguments or `let`-bindings have lexical scope. Global bindings are
-`define`-bindings have no scope, wherever they appear they take precedence.
+`define`-bindings and have no scope, wherever they appear they take precedence.
 
 ### Recursion
 
@@ -285,7 +291,7 @@ expression except for errors inside the `load` function, where `err` is
 returned. Other errors abort the whole top-level form.
 
 An error message is prefixed with a question mark: `? message[: form]`. A fatal
-error prints a message prefixed with an exclamation mark: `! fatal[: message]`.
+error prints a message prefixed with an exclamation mark: `! fatal: message`.
 
 ### Builtin Functions
 
@@ -378,7 +384,7 @@ C:\> sled to\my\code.scm
 (load 'to\\my\\code.scm)
 ```
 
-The file path also falls under the 16 character limit.
+The file path also falls under the 16-character limit.
 
 ### REPL
 
@@ -496,11 +502,11 @@ The standard library consumes about 5% of nodes and characters.
 
 **Special Forms**
 
-|                                     |                                 |                                           |
-|-------------------------------------|---------------------------------|-------------------------------------------|
-| [`begin`](#begin-body1-bodyn)       | [`comment`](#comment-arg1-argn) | [`define`](#define-sym-arg)               |
-| [`if`](#if-arg1-arg2-arg3)          | [`ifnil`](#ifnil-arg1-arg2)     | [`lambda`](#lambda-arg1-argn-body1-bodyn) |
-| [`let`](#let-arg1-arg2-body1-bodyn) | [`quote`](#quote-arg)           | [`value`](#value-sym)                     |
+|                                           |                                      |                                 |
+|-------------------------------------------|--------------------------------------|---------------------------------|
+| [`begin`](#begin-body1-bodyn)             | [`case`](#case-arg-sym1-body1-bodyn) | [`comment`](#comment-arg1-argn) |
+| [`define`](#define-sym-arg)               | [`if`](#if-arg1-arg2-arg3)           | [`ifnil`](#ifnil-arg1-arg2)     |
+| [`lambda`](#lambda-arg1-argn-body1-bodyn) | [`let`](#let-arg1-arg2-body1-bodyn)  | [`quote`](#quote-arg)           |
 
 **Builtin Functions**
 
@@ -523,15 +529,15 @@ The standard library consumes about 5% of nodes and characters.
 
 **Standard Library**
 
-|                                     |                                 |                                  |
-|-------------------------------------|---------------------------------|----------------------------------|
-| [`and?`](#and-arg1-arg2)            | [`append`](#append-lst1-lst2)   | [`assert`](#assert-arg-sym)      |
-| [`compose`](#compose-arg-fun1-funn) | [`dec`](#dec-arg)               | [`equal?`](#equal-arg1-arg2)     |
-| [`error?`](#error)                  | [`get`](#get-sym-lst)           | [`id`](#id-arg)                  |
-| [`inc`](#inc-arg)                   | [`list`](#list-arg1-argn)       | [`list?`](#list-arg)             |
-| [`map`](#map-fun-lst)               | [`member`](#member-arg-lst)     | [`or?`](#or-arg1-arg2)           |
-| [`pair?`](#pair-arg)                | [`printid`](#printid-arg1-arg2) | [`println`](#println-arg1-argn)  |
-| [`put`](#put-sym-arg-lst)           | [`revpend`](#revpend-lst1-lst2) | [`shorter?`](#shorter-lst1-lst2) |
+|                                     |                               |                                 |
+|-------------------------------------|-------------------------------|---------------------------------|
+| [`and?`](#and-arg1-arg2)            | [`append`](#append-lst1-lst2) | [`assert`](#assert-arg-sym)     |
+| [`compose`](#compose-arg-fun1-funn) | [`dec`](#dec-arg)             | [`drop`](#drop-lst1-lst2)       |
+| [`equal?`](#equal-arg1-arg2)        | [`error?`](#error)            | [`get`](#get-sym-lst)           |
+| [`id`](#id-arg)                     | [`inc`](#inc-arg)             | [`list`](#list-arg1-argn)       |
+| [`list?`](#list-arg)                | [`map`](#map-fun-lst)         | [`member`](#member-arg-lst)     |
+| [`or?`](#or-arg1-arg2)              | [`pair?`](#pair-arg)          | [`printid`](#printid-arg1-arg2) |
+| [`println`](#println-arg1-argn)     | [`put`](#put-sym-arg-lst)     | [`revpend`](#revpend-lst1-lst2) |
 
 ---
 
@@ -660,6 +666,21 @@ This **standard alias** is for `newline`.
 
 ---
 
+### `case <arg> (<sym1> <body1> ...) ... <bodyN>`
+
+This **special form** evaluates the body of the clause whose first element
+matches the first argument. The last clause is always the default clause without
+a symbol first element.
+
+```
+(case 'x
+  (x (print 'x) '1)
+  (y (print 'y) '2)
+  (print '0))        ; → 1
+```
+
+---
+
 ### `comment <arg1> ... <argN>`
 
 This **special form** is not evaluated. Use as block comment.
@@ -711,7 +732,7 @@ empty; use to decrement tally numbers.
 ### `define <sym> <arg>`
 
 This **special form** creates a new binding of the second argument to the first
-argument symbol, and returns the second argument. Bindings can be re-`defined`,
+argument symbol, and returns the second argument. Bindings can be re-`define`d,
 except special symbols, special forms, builtin functions, or standard library
 symbols.
 
@@ -732,6 +753,19 @@ defined at global scope.
 ```
 (defined? 'defined?)   ; → true
 (defined? 'undefined)  ; → nil
+```
+
+---
+
+### `drop <lst1> <lst2>`
+
+This **standard library** binary function returns the list tail of the second
+argument list exceeding the length of the first argument list. Use also to
+detect if the first list is shorter than the second.
+
+```
+(drop nil (list nil))  ; → (nil)
+(drop (list nil) nil)  ; → nil
 ```
 
 ---
@@ -1190,7 +1224,7 @@ a white space or line break via return key / enter key and returns it.
 
 > **NOTE:** `read` prompts with `'` and reads one symbol from the keyboard - not
             standard input. It re-prompts on empty or invalid input instead of
-            erroring and returns the `EOT` on `Ctrl+Z` (EOF).
+            erroring and returns the `EOT` on `CTRL+Z` (EOF).
 
 ---
 
@@ -1241,18 +1275,6 @@ resolves to the enclosing `lambda`. Outside a `lambda`, `self` is undefined.
 
 ---
 
-### `shorter? <lst1> <lst2>`
-
-This **standard library** binary predicate answers if the first argument list
-has fewer elements than the second argument list.
-
-```
-(shorter? nil (list nil))  ; → true
-(shorter? (list nil) nil)  ; → nil
-```
-
----
-
 ### `symbol? <arg>`
 
 This **builtin** unary predicate answers if its argument is a symbol.
@@ -1285,23 +1307,12 @@ true  ; → true
 
 ---
 
-### `value <sym>`
-
-This **special form** evaluates its argument, which must yield a symbol, and
-returns that symbol's value. Respects lexical scope.
-
-```
-(value 'ver)  ; → sled-0.7
-```
-
----
-
 ### `ver`
 
 This **special symbol** evaluates to a symbol identifying the version of SLED.
 
 ```
-ver  ; → sled-0.7
+ver  ; → sled-0.8
 ```
 
 ---
@@ -1318,8 +1329,8 @@ This is a **standard alias** for `empty?`; use for testing tally numbers.
 ## Usage
 
 * SLED is made for a disk operating system like **FreeDOS**, **DR DOS** or **MS-DOS** (>=3)
-* Outside DOS, a DOS emulator like **DOSBox**, **DOSBox-X**, **DOSBox-Staging** is required
-* No libc, all standard I/O goes through `int 21h` directly (SCM, uses `int 10h` and `int 16h`)
+* Outside DOS, a DOS emulator like **DOSBox**, **DOSBox-X**, or **DOSBox-Staging** is required
+* No libc, all standard I/O goes through `int 21h` directly (SCM uses `int 10h` and `int 16h`)
 * Uses real mode "small memory model" (64K data segment and 64K code segment)
 * Minimally, a 286 CPU with 256K RAM should be sufficient
 * Run the shell script `./sled.sh` (auto-selects the installed DOSBox) on Linux, BSD, macOS, or Unix
@@ -1327,6 +1338,7 @@ This is a **standard alias** for `empty?`; use for testing tally numbers.
 * Building SLED requires [Microsoft C Compiler](https://github.com/davidly/dos_compilers) or [Open Watcom](https://github.com/open-watcom/open-watcom-v2), as well as `make`
 * Build with MS C 6.0A: `make build_msc` (Compiler location via `MSC`)
 * Build with Open Watcom v2: `make build_owc` (Compiler location via `OWC`)
+* Under DOS build with `BUILD MSC` or `BUILD OWC`
 * Run build: `make run`
 * Run tests: `make tests`
 * Run demos: `make demos`
@@ -1437,7 +1449,7 @@ Example image:
 * The double buffer is then flushed to the screen buffer.
 * The screen buffer is text page 0 (`B800:0000`),
 * the double buffer starts on text page 1 (`B800:1000`),
-* the offscreen buffer then starts at `B800:1F00` and is 24K.
+* the available offscreen buffer then starts at `B800:1F00` and is 24K.
 
 #### Status Row
 
@@ -1462,10 +1474,10 @@ The `key` command waits for one of the following keys to be pressed:
 
 #### Commands
 
-|                                         |                         |                                    |
-|-----------------------------------------|-------------------------|------------------------------------|
-| [`scm 'draw`](#scm-draw-sym1-sym2-sym3) | [`scm 'key`](#scm-key)  | [`scm 'load`](#scm-load-sym1-sym2) |
-| [`scm 'reset`](#scm-reset)              | [`scm 'set?`](#scm-set) | [`scm 'show`](#scm-show)           |
+|                                         |                         |                                         |
+|-----------------------------------------|-------------------------|-----------------------------------------|
+| [`scm 'draw`](#scm-draw-sym1-sym2-sym3) | [`scm 'key`](#scm-key)  | [`scm 'load`](#scm-load-sym1-sym2-sym3) |
+| [`scm 'reset`](#scm-reset)              | [`scm 'set?`](#scm-set) | [`scm 'show`](#scm-show)                |
 
 ---
 
@@ -1486,8 +1498,8 @@ success `nil` is returned.
 ##### `scm 'key`
 
 This **scm** command waits for one of eight keys and returns an associated symbol:
-"Escape" `'es`, "Enter", `'en`, "Up" `'up`, "Down" `'dn`, "Left" `'lt`,
-"Right" `'rt`, "z", `'b1`, "x", `'b2`.
+"Escape" `'es`, "Enter" `'en`, "Up" `'up`, "Down" `'dn`, "Left" `'lt`,
+"Right" `'rt`, "z" `'b1`, "x" `'b2`.
 
 ```
 (scm 'key)  ; → es
@@ -1495,14 +1507,15 @@ This **scm** command waits for one of eight keys and returns an associated symbo
 
 ---
 
-##### `scm 'load <sym1> <sym2>`
+##### `scm 'load <sym1> <sym2> [<sym3>]`
 
-This **scm** command loads an image with the file path in the second symbol
-argument and associates it to the symbol in the first argument. On success `nil`
-is returned.
+This **scm** command loads an image with the first symbol argument as file base
+name, the second symbol argument as its file extension, and the optional third
+symbol argument as the file path, and associates it to that symbol in the first
+argument. On success `nil` is returned.
 
 ```
-(scm 'load 'img 'img.hex)  ; → nil
+(scm 'load 'img 'hex)  ; → nil
 ```
 
 > **NOTE:** `scm 'load` can load [XPM2](https://en.wikipedia.org/wiki/X_PixMap#XPM2)
@@ -1544,6 +1557,18 @@ counters are reset, the double buffer is cleared, page 0 is set, and the cursor 
 ```
 (scm 'show)  ; → nil
 ```
+
+---
+
+### DOSWAYOUT
+
+To demonstrate the capabilities of `SLED` and `SCM`, a small game engine is
+included. This is a first-person, turn-based, grid-based, raycasting dungeon
+crawler, in 150 lines of code, named **DOSWAYOUT**. The name is a reference to
+the 3D maze game [WinWayout](https://win16.page/winway.htm) from 1992 for
+Windows 3.1. The game is started from the directory `DOSWAY` via `DOSWAY.BAT`.
+Controls are the arrow keys for stepping forward, turning left, right or around,
+and escape to exit the game.
 
 ---
 

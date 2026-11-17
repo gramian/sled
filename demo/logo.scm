@@ -1,6 +1,6 @@
 ;;;; logo.scm
 
-(scm 'load 'logo 'demo\\logo.hex)
+(scm 'load 'logo 'hex 'demo)
 
 ((lambda ()
   (scm 'draw 'logo 'c)

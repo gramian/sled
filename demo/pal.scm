@@ -1,4 +1,6 @@
-(scm 'load 'pal 'demo\\pal.hex)
+;;;; pal.scm
+
+(scm 'load 'pal 'hex 'demo)
 
 (scm 'draw 'pal 'c)
 

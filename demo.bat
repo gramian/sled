@@ -1,3 +1,4 @@
+
 @echo off
 
 cls
@@ -20,4 +21,4 @@ pause
 
 sled /B demo\logo.scm
 
-exit
+EXIT

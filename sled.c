@@ -1,5 +1,5 @@
 #define NAME "sled"
-#define VERSION "0.7"
+#define VERSION "0.8"
 #define TITLE "SLED - Schemy LISP en DOS (" VERSION ")"
 
 #if !defined(__SMALL__) && !defined(M_I86SM) && !defined(_M_I86SM)
@@ -41,9 +41,9 @@ typedef unsigned int node;
 
 enum { SPCL = NNODES, UNDEF, VOID, RPAREN, DOT, EOT, ERR, NIL };  // Sentinels (live above the node heap)
 
-enum { MHALT = 0, MCHAIN, MRETN, MOR, MPRED, MEXPR, MLIST, MCALL, MLET, MBEGIN, MSET, MCONS, MVALUE };  // Trampoline Modes (do not reorder!)
+enum { MHALT = 0, MCHAIN, MRETN, MOR, MPRED, MEXPR, MLIST, MCALL, MLET, MBEGIN, MSET, MCONS, MCASE };  // Trampoline Modes (do not reorder!)
 
-enum { S_BEGIN = 0, S_DEFINE, S_IF, S_IFNIL, S_LAMBDA, S_LET, S_QUOTE, S_VALUE,  // Special Forms
+enum { S_BEGIN = 0, S_CASE, S_DEFINE, S_IF, S_IFNIL, S_LAMBDA, S_LET, S_QUOTE,  // Special Forms
        NSPECIAL };
 
 enum { F_APPLY = NSPECIAL, F_ATOM, F_CONS, F_DEFINED, F_EMPTY, F_ENV, F_EOF,  // Builtin Functions
@@ -58,7 +58,7 @@ enum { K_COMMENT = NBUILTIN, K_ERR, K_HELP, K_TRUE, K_VERSTR,  // Special Symbol
 
 // Heap
 struct { node a, d; } Heap[NNODES];  // Each node is two 16-bit words
-node Freelist;                       // List of remaining free nodes
+node Freelist = NIL;                 // List of remaining free nodes
 
 // Registers (GC Roots)
 node Acc = NIL;      // Current expression
@@ -274,7 +274,7 @@ void print_node(node n, sint d) {
     if (n == NIL)          sys_stamp("nil");
     else if (isSymbol(n))  sys_print(symstr(n));
     else if (n == EOT)     sys_stamp("*eot*");
-    else if (n == UNDEF)   sys_stamp("*undef*");
+    // else if (n == UNDEF)   sys_stamp("*undef*");  // unreachable
     else if (isClosure(n)) sys_stamp("*closure*");
     else if (isAtom(n))    sys_stamp("*atom*");
     else if (d < 0)        sys_stamp("*list*");
@@ -301,7 +301,7 @@ void print_node(node n, sint d) {
 void print_env(void) {
     node u;
     for (u = UserDef; (u != NIL) && !Interrupted; u = cdr(u)) {
-        sys_print(symstr(car(u)));
+        sys_fresh(symstr(car(u)));
         sys_stamp("\t");
         print_node(cdar(u), -1);
         sys_newline();
@@ -326,7 +326,7 @@ void print_usage(uint used) {
                               "....................";  // BAR_WIDTH '.'
     uint filled = used / (NNODES / BAR_WIDTH);
 
-    sys_stamp("[");
+    sys_fresh("[");
     sys_write(Bar + BAR_WIDTH - filled, BAR_WIDTH);
     sys_stamp("]" DOS_EOL);
 }
@@ -393,7 +393,7 @@ void mark(node n) {
     register node p = NIL, t;
     uint w;
     for (;; n = t) {
-        if ((n < NRESERVED) || (n >= SPCL) || ((w = Heap[n].d) & MARK_TAG)) {  // reserved cdrs self-evaluate
+        if ((n < NRESERVED) || (n >= SPCL) || ((w = Heap[n].d) & MARK_TAG)) {  // reserved cdr self-evaluates
             if (p == NIL) break;
             w = Heap[p].d;
             if (w & SWAP_TAG) {                // done with car, trace cdr now
@@ -490,11 +490,11 @@ node vpop(void) {
 node find_sym(const char *s) /*pure*/ {
     node p, sym;
     const char *t;
-    for (sym = 0; sym < Pooltop; sym++) {
+    for (sym = 0; sym < Pooltop; sym++) {      // search reserved symbols
         t = symstr(sym);
         if ((*t == *s) && streq(s, t)) return sym;
     }
-    for (p = Symbols; p != NIL; p = cdr(p)) {
+    for (p = Symbols; p != NIL; p = cdr(p)) {  // search non-reserved symbols
         sym = car(p);
         t = symstr(sym);
         if ((*t == *s) && streq(s, t)) return sym;
@@ -517,9 +517,8 @@ node add_sym(const char *s, node v) {
         n = Pooltop++;
         Heap[n].a = off | SYMB_TAG;
         Heap[n].d = n;  // if SPCL, symbol's value cell self-evaluates
-    } else {
-        n = cons(NIL, v);
-        Heap[n].a = off | SYMB_TAG;
+    } else {            // regular symbol
+        n = cons(off | SYMB_TAG, v);
         Symbols = cons(n, Symbols);
     }
     return n;
@@ -547,7 +546,7 @@ void iopop(void) {
 
 // Read character (and print prompt)
 sint read_char(void) {
-    sint c;
+    uint c;
     if (Interrupted) return EOT;
     if (IO.next != EOT) {
         c = IO.next;
@@ -595,14 +594,14 @@ node read_sym(sint c) {
     IO.next = c;
     if (Interrupted) return ERR;
     ERROR_IF(bad, bad, VOID);
-    return add_sym(sym, UNDEF);  // add_sym checks if the symbol exists and if so returns its index
+    return add_sym(sym, UNDEF);  // checks if symbol exists, if so return index
 }
 
 // Read symbol from the console
 node read_input(void) {
     sint c;
     node n = ERR;
-    if (!iopush("CON")) return EOT;
+    if (!iopush("CON")) return ERR;
     while ((ERR == n) && !Interrupted) {
         IO.pos = IO.len = 0; IO.next = EOT;
         sys_stamp("'");
@@ -654,7 +653,8 @@ node parse_list(void) {
         if (VOID == n) continue;
         if (DOT == n) {
             BREAK_IF(NIL == t, n, Badpair, VOID);
-            n = parse(); if (ERR == n) break;
+            n = parse();
+            if (ERR == n) break;
             BREAK_IF((EOT == n) || (VOID == n) ||
                      (RPAREN == n) || (DOT == n), n, Badpair, VOID);
             set_cdr(t, n);
@@ -757,11 +757,11 @@ node funapp(node c, node a) {
     node v = car(c), b = cdr(c);
     if (!isTail()) { vpush(Env); mpush(MRETN); }
     Env = car(b);
-    for (; !isAtom(v); a = cdr(a), v = cdr(v)) {  // bind args
-        ERROR_IF(NIL == a, "missing args", Acc);
-        Env = bind(car(v), car(a));
+    for (; !isAtom(v); v = cdr(v)) {  // bind args (missing ones are nil)
+        Env = bind(car(v), (a == NIL) ? NIL : car(a));
+        if (a != NIL) a = cdr(a);
     }
-    if (NIL != v) Env = bind(v, a);               // rest arg
+    if (NIL != v) Env = bind(v, a);   // rest arg (nil if none left)
     else ERROR_IF(NIL != a, "extra args", Acc);
     b = cdr(b);
     if (NIL != cdr(b)) { mpush(MBEGIN); vpush(cdr(b)); }
@@ -781,6 +781,11 @@ node special(node x) {
             mpush(MPRED);
             vpush(cdr(tl));  // (then, else)
             return ad;       // predicate
+        case S_CASE:    // (case any (sym any ...) ... any)
+            SYNTAX_IF(x, 2, -1);
+            mpush(MCASE);
+            vpush(cdr(tl));  // clauses, then the default expression
+            return ad;       // key
         case S_BEGIN:   // (begin . any)
             SYNTAX_IF(x, 0, -1);
             if (tl == NIL) return NIL;
@@ -801,10 +806,6 @@ node special(node x) {
             hd = bind(S_self, tl);
             set_car(cdr(tl), hd);
             return tl;
-        case S_VALUE:   // (value sym)
-            SYNTAX_IF(x, 1, 1);
-            mpush(MVALUE);
-            return ad;
         case S_LET:     // (let (v e) body ...)
             SYNTAX_IF(x, 2, -1);
             ERROR_IF(isAtom(ad) || badarity(ad, 1, 1) || badname(car(ad)), Syntax, x);
@@ -1042,8 +1043,11 @@ node eval(node x) {
                 Acc = vpop();
                 m = MEXPR;
                 break;
-            case MVALUE:  // argument evaluated
-                BREAK_IF(!isSymbol(Acc), Acc, Type, Acc);
+            case MCASE:   // resume after evaluating "case" key
+                n = vpop();  // clauses, then default
+                while ((cdr(n) != NIL) && (isAtom(car(n)) ||
+                       (caar(n) != Acc))) n = cdr(n);
+                Acc = (cdr(n) == NIL) ? car(n) : cons(S_BEGIN, cdar(n));
                 m = MEXPR;
                 break;
             case MCHAIN:  // close the cons chain
@@ -1064,8 +1068,8 @@ node eval(node x) {
 
 // Load script file
 node load(const char *s, bool ie) {
-    if (IOdepth >= NLOAD) { error("nested load", VOID); return K_ERR; }
-    if (!iopush(s)) return K_ERR;
+    if (IOdepth >= NLOAD) { error("nested load", VOID); return set_ans(K_ERR); }
+    if (!iopush(s)) return set_ans(K_ERR);
 
     vpush(Env);
     set_ans(NIL);  // Set "ans" in case of empty file
@@ -1073,11 +1077,10 @@ node load(const char *s, bool ie) {
         Env = NIL;
         Acc = parse();
         if (EOT == Acc) break;
-        if (VOID == Acc) continue;
         if (ERR != Acc) Acc = eval(Acc);
         if (ERR == Acc) {
             set_ans(K_ERR);
-            if (!ie) break;  // if ie, ignore errors
+            if (!ie) break;  // if "ie", ignore errors
             continue;
         }
         if (VOID == Acc) continue;
@@ -1097,10 +1100,10 @@ void reserved(void) {
     const char* names[NRESERVED];
     uint i;
 
-    names[S_BEGIN]  = "begin";     names[S_DEFINE]  = "define";
-    names[S_IF]     = "if";        names[S_IFNIL]   = "ifnil";
-    names[S_LAMBDA] = "lambda";    names[S_LET]     = "let";
-    names[S_QUOTE]  = "quote";     names[S_VALUE]   = "value";
+    names[S_BEGIN]  = "begin";     names[S_CASE]    = "case";
+    names[S_DEFINE] = "define";    names[S_IF]      = "if";
+    names[S_IFNIL]  = "ifnil";     names[S_LAMBDA]  = "lambda";
+    names[S_LET]    = "let";       names[S_QUOTE]   = "quote";
 
     names[F_APPLY]  = "apply";     names[F_ATOM]    = "atom?";
     names[F_CONS]   = "cons";      names[F_DEFINED] = "defined?";
@@ -1120,9 +1123,9 @@ void reserved(void) {
 
     for (i = 0; i < NRESERVED; i++) add_sym(names[i], SPCL);
 
-    S_ans   = add_sym("ans", NIL);
-    S_self  = add_sym("self", UNDEF);
-    S_ver   = add_sym("ver", K_VERSTR);
+    S_ans  = add_sym("ans", NIL);
+    S_self = add_sym("self", UNDEF);
+    S_ver  = add_sym("ver", K_VERSTR);
 }
 
 // Build standard library path
@@ -1150,19 +1153,19 @@ int _cdecl main(sint argc, char **argv) {
     bool ignore = (opt == 'i') || (opt == 'I'),
          batch = ignore || (opt == 'b') || (opt == 'B'),
          status = 0;
-    static char stdlib[PATHLEN];  // maximum full file path can be 79 chars in DOS
+    static char stdlib[PATHLEN];  // max full file path can be 79 chars in DOS
 
     // Welcome banner
     sys_stamp(DOS_EOL TITLE DOS_EOL DOS_EOL);
 
     // Help screen
-    if (opt == '?') {
+    if (opt && (!batch || (argc < 3))) {
         sys_stamp("Usage: " NAME " [/?] [/B] [/I] [file]" DOS_EOL DOS_EOL
                   "  /?       This help" DOS_EOL
                   "  file     Load file" DOS_EOL
                   "  /B file  Load file, exit" DOS_EOL
                   "  /I file  Load file (ignore errors), exit" DOS_EOL DOS_EOL);
-        return 0;
+        return opt != '?';
     }
 
     // Set break interrupt handler
@@ -1193,12 +1196,9 @@ int _cdecl main(sint argc, char **argv) {
     // Load script CLI arguments
     if (Restartbuf[0]) {
         status = (load(Restartbuf, FALSE) == K_ERR);
+        if (!Restart) Restartbuf[0] = 0;
     } else if (argc > 1) {
-        if (batch && (argc < 3)) {
-            sys_stamp("missing file" DOS_EOL);
-            status = 1;
-            Quit = TRUE;
-        } else status = (load(batch ? argv[2] : argv[1], ignore) == K_ERR);
+        status = (load(batch ? argv[2] : argv[1], ignore) == K_ERR);
     }
     if (batch) Quit = TRUE;
 
@@ -1209,11 +1209,11 @@ int _cdecl main(sint argc, char **argv) {
         if (Interrupted) Acc = ERR;
         if (EOT == Acc) break;
         if (K_HELP == Acc) { print_help(); continue; }
-        if (VOID == Acc) continue;
         if (ERR != Acc) Acc = eval(Acc);
         if (ERR == Acc) {
             set_ans(K_ERR);
-            if (IO.pos && (IO.next != '\n'))
+            if (Interrupted) IO.pos = IO.len = 0;
+            else if (IO.next != '\n')
                 while ((IO.pos < IO.len) && (IO.buf[IO.pos++] != '\n')) ;
             IO.next = EOT;
             continue;

@@ -1,5 +1,7 @@
-(scm 'load 'xpm 'demo\\test.xpm)
+;; xpm.scm
 
-(scm 'draw 'xpm 'c)
+(scm 'load 'test 'xpm 'demo)
+
+(scm 'draw 'test 'c)
 
 (scm 'show)

@@ -9,16 +9,15 @@ ifeq ($(strip $(DOSBOX)),)
 $(error No DOSBox found. Install dosbox, dosbox-x or dosbox-staging, or set DOSBOX=/path/to/dosbox)
 endif
 
-SRC    = sled.c
 OUT    = SLED.EXE
-STK    = 4096
 
 dosbox = $(DOSBOX) \
 	-c "config -set cpu cycles=$(1)" \
 	-c "mount q $(CURDIR)" \
-	-c "q:"
+	-c "q:" \
+	-exit
 
-.PHONY: build_msc build_owc tests bench run clean
+.PHONY: build_msc build_owc tests bench run clean dosway
 
 build_msc:
 	$(call dosbox,50000) \
@@ -26,42 +25,39 @@ build_msc:
 		-c "set PATH=C:\BIN;C:\BINB" \
 		-c "set INCLUDE=C:\INCLUDE" \
 		-c "set LIB=C:\LIB" \
-		-c "cl /AS /Fe$(OUT) /FPa /W2 /Ox /Zp2 /G2 /DSCM $(SRC) /link /NOE /STACK:$(STK) > BUILD.LOG" \
-		-c "exit"
+		-c "BUILD MSC"
 	cat BUILD.LOG
-	ls -lS $(OUT)
 
 build_owc:
 	$(call dosbox,50000) \
 		-c "mount c $(OWC)" \
-		-c "set WATCOM=C:\ " \
+		-c "set WATCOM=C:" \
 		-c "set PATH=C:\BINW" \
-		-c "wcl /ms /fe=$(OUT) /l=dos /w2 /ox /zp=2 /2 /dSCM $(SRC) /k$(STK) > BUILD.LOG" \
-		-c "exit"
+		-c "BUILD OWC"
 	cat BUILD.LOG
-	ls -lS $(OUT)
 
 tests:
 	$(call dosbox,25000) \
-		-c "$(OUT) /I demo\tests.scm > TESTS.LOG" \
-		-c "exit"
+		-c "BUILD TESTS"
 	cat TESTS.LOG
 
 bench:
 	$(call dosbox,25000) \
-		-c "time > BENCH.LOG" \
-		-c "$(OUT) /B demo\tak.scm >> BENCH.LOG" \
-		-c "time >> BENCH.LOG" \
-		-c "exit"
+		-c "BUILD BENCH"
 	cat BENCH.LOG
 
 demos:
 	$(call dosbox,25000) \
-		-c "demo.bat"
+		-c "DEMO"
 
 run:
 	$(call dosbox,25000) \
 		-c "$(OUT)"
 
+dosway:
+	$(call dosbox,50000) \
+		-c "CD dosway" \
+		-c "DOSWAY"
+
 clean:
-	rm -f $(OUT) *.obj *.map
+	rm -f $(OUT) *.OBJ *.LOG

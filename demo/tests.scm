@@ -106,7 +106,7 @@ nil
 
 (check 'ver 'a (symbol? ver))
 
-(check 'ver 'b (equiv? ver 'sled-0.7))
+(check 'ver 'b (equiv? ver 'sled-0.8))
 
 (newline)
 
@@ -216,15 +216,15 @@ nil
 
 (newline)
 
-;; value
+;; case
 
-(check 'value 'a (equiv? (value 'ver) 'sled-0.7))
+(check 'case 'a (equiv? (case 'b (a 'x) (b 'y)) 'y))
 
-(define aa 'x)
+(check 'case 'b (equiv? (case 'c (a 'x) (b 'y) 'z) 'z))
 
-(check 'value 'b (equiv? (value 'aa) 'x))
+(check 'case 'c (equiv? (case 'c (a 'x) nil) nil))
 
-(check 'value 'c (equiv? (let (dd 'z) (value 'dd)) 'z))
+(check 'case 'd (equiv? (case 'c (a 'x) (begin (id 'z))) 'z))
 
 (newline)
 
@@ -562,6 +562,24 @@ nil
 
 (newline)
 
+;; drop
+
+(check 'drop 'a (not (drop nil nil)))
+
+(check 'drop 'b (drop nil '(nil)))
+
+(check 'drop 'c (not (drop '(nil) nil)))
+
+(check 'drop 'd (not (drop '(nil) '(nil))))
+
+(check 'drop 'e (drop '(nil) '(nil nil)))
+
+(check 'drop 'f (not (drop '(nil nil) '(nil))))
+
+(check 'drop 'g (not (drop '(nil nil) '(nil nil))))
+
+(newline)
+
 ;; equal?
 
 (check 'equal? 'a (equal? nil nil))
@@ -761,24 +779,6 @@ nil
 (check 'revpend 'g (equal? (revpend '(x y z) '(a)) '(z y x a)))
 
 (check 'revpend 'h (equal? (revpend '(x y z) '(a b)) '(z y x a b)))
-
-(newline)
-
-;; shorter?
-
-(check 'shorter? 'a (not (shorter? nil nil)))
-
-(check 'shorter? 'b (shorter? nil '(nil)))
-
-(check 'shorter? 'c (not (shorter? '(nil) nil)))
-
-(check 'shorter? 'd (not (shorter? '(nil) '(nil))))
-
-(check 'shorter? 'e (shorter? '(nil) '(nil nil)))
-
-(check 'shorter? 'f (not (shorter? '(nil nil) '(nil))))
-
-(check 'shorter? 'g (not (shorter? '(nil nil) '(nil nil))))
 
 (newline)
 

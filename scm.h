@@ -14,10 +14,10 @@
 
 // Constants ###################################################################
 
-#define SCM_SIZE    (0x7000u - SCM_W * SCM_H)             // Pool size (EGA/VGA)
-#define SCM_SCREEN  ((volatile byte _far*) 0xB8000000L)   // Screen buffer (page 0)
-#define SCM_DOUBLE  ((byte _far*) 0xB8001000L)            // Double buffer (page 1)
-#define SCM_POOL    (SCM_DOUBLE + SCM_W * SCM_H)          // Offscreen Image pool
+#define SCM_SIZE    (0x7000u - SCM_W * SCM_H)            // Pool size (EGA/VGA)
+#define SCM_SCREEN  ((volatile byte _far*) 0xB8000000L)  // Screen buffer (page 0)
+#define SCM_DOUBLE  ((byte _far*) 0xB8001000L)           // Double buffer (page 1)
+#define SCM_POOL    ((byte _far*) 0xB8001F00L)           // Offscreen Image pool (SCM_DOUBLE + SCM_W * SCM_H)
 
 #define SCM_MODE    (*(volatile byte _far*) 0x00400049L)  // BIOS video mode
 #define SCM_COLS    (*(volatile uint _far*) 0x0040004AL)  // EGA/VGA cols
@@ -26,13 +26,10 @@
 // State #######################################################################
 
 struct {
-    bool errored;     // error flag
+    node x;           // erroring form
     uint top;         // image pool fill level
     sint l, t, r, b;  // edge stacking depth
 } Scm;
-
-// Fail the current command with message (NONE when already reported)
-#define scm_fail(m) (Scm.errored = TRUE, (const char*) (m))
 
 // BIOS ########################################################################
 
@@ -49,18 +46,15 @@ sint _cdecl scm_poll(void) {
         done:
     }
     if (!k || ((k & 0xFF) == 0x03)) {  // Ctrl+Break (0000h) or Ctrl+C (2E03h)
-        sys_poll();
         Interrupted = TRUE;
         return -1;
     }
-    return k >> 8;                     // scan code
+    return (k >> 8);                   // scan code
 }
 
-// Set page zero and move the cursor on page 0 to row 24
+// Move the cursor on page 0 to row 24
 void _cdecl scm_cursor(void) {
     _asm {
-        mov ax, 0x0500
-        int 10h  // set active page
         mov ah, 2
         xor bh, bh
         mov dx, 0x1800
@@ -68,12 +62,14 @@ void _cdecl scm_cursor(void) {
     }
 }
 
-// Attribute bit 7 selects bright backgrounds instead of blinking (EGA/VGA)
+// Set page zero and attribute-bit 7 selects bright backgrounds instead of blinking (EGA/VGA)
 void _cdecl scm_bright(void) {
     _asm {
+        mov ax, 0x0500
+        int 10h  // set active page
         mov ax, 0x1003
         xor bx, bx
-        int 10h
+        int 10h  // set bright instead of blinking
     }
 }
 
@@ -85,29 +81,37 @@ void _cdecl scm_wait(void) {
     }
 }
 
+// Utils #######################################################################
+
+// Fail the current command with message
+node _fastcall scm_fail(const char* m) {
+    return error(m, Scm.x);
+}
+
 // Keys ########################################################################
 
 // Wait for special key
-const char* scm_key(void) {
-    while (!Interrupted) {
+node scm_key(void) {
+    const char* k = NONE;
+    while (!k && !Interrupted) {
         switch (scm_poll()) {
             case 0xFF: scm_wait(); break;  // avoid busy-wait
-            case 0x48: return "up";        // up arrow key
-            case 0x50: return "dn";        // down arrow key
-            case 0x4B: return "lt";        // left arrow key
-            case 0x4D: return "rt";        // right arrow key
-            case 0x01: return "es";        // escape key
-            case 0x1C: return "en";        // enter key
-            case 0x2C: return "b1";        // z key
-            case 0x2D: return "b2";        // x key
+            case 0x48: k = "up"; break;    // up arrow key
+            case 0x50: k = "dn"; break;    // down arrow key
+            case 0x4B: k = "lt"; break;    // left arrow key
+            case 0x4D: k = "rt"; break;    // right arrow key
+            case 0x01: k = "es"; break;    // escape key
+            case 0x1C: k = "en"; break;    // enter key
+            case 0x2C: k = "b1"; break;    // z key
+            case 0x2D: k = "b2"; break;    // x key
         }
     }
-    return scm_fail(NONE);
+    return k ? add_sym(k, UNDEF) : ERR;
 }
 
 // Images ######################################################################
 
-// Find image by name in image pool
+// Find image by name in pool
 byte _far* scm_find(const char* s) {
     byte _far* p = SCM_POOL;
     byte _far* q = SCM_POOL + Scm.top;
@@ -119,18 +123,21 @@ byte _far* scm_find(const char* s) {
     return NONE;
 }
 
-// Load hex file with name into image pool
-const char* scm_load(const char* s, const char* f) {
+// Load hex file with name into pool
+node scm_load(const char* s, const char* y, const char* d) {  // name, extension, directory prefix
     static const char Imagesize[] = "image size";
+    char f[3 * SYMLEN + 2];             // file name: dir \ name . ext
     byte _far* p = SCM_POOL + Scm.top;  // header of the new image
     uint i = SCM_HDR;                   // start of pixels
     const char* e = NONE;
     sint c, k, w = 0, h = 0, x = 0;
 
-    if (!*s) return scm_fail("missing name");
-    if (!*f) return scm_fail("missing file");
+    if (!*s) return scm_fail("image name");
+    if (!*y) return scm_fail("image ext");
     if (scm_find(s)) return scm_fail("name taken");
-    if (!iopush(f)) return scm_fail(NONE);  // iopush reported the error
+    strcp(strcp(strcp(*d ? strcp(strcp(f, d), "\\") : f, s), "."), y);
+
+    if (!iopush(f)) return ERR;  // iopush reported the error
     do {
         c = read_char();
         if ((c == '\r') || (c == '\n') || (c == EOT)) {  // end of row (CRLF gives a blank row, skipped)
@@ -155,7 +162,7 @@ const char* scm_load(const char* s, const char* f) {
         }
     } while ((c != EOT) && !e);
     iopop();
-    if (Interrupted) return scm_fail(NONE);
+    if (Interrupted) return ERR;
     if (!e && !h) e = Imagesize;
     if (e) return scm_fail(e);
 
@@ -163,17 +170,17 @@ const char* scm_load(const char* s, const char* f) {
     p[SCM_WID] = (byte) w;
     p[SCM_HGT] = (byte) h;
     Scm.top += i;
-    return NONE;
+    return NIL;
 }
 
 // Screen ######################################################################
 
 // Reset Edges
-const char* scm_reset(void) {
+node scm_reset(void) {
     Scm.l = Scm.t = 0;
     Scm.r = SCM_W;
     Scm.b = SCM_H;
-    return NONE;
+    return NIL;
 }
 
 // Clear double buffer
@@ -185,7 +192,7 @@ void scm_clear(void) {
 }
 
 // Stack image centered (on edge t, b, l, r, or centered c) in off-screen buffer
-const char* scm_draw(const char* s, const char* e, const char* m) {
+node scm_draw(const char* s, const char* e, const char* m) {
     byte _far* p = scm_find(s);
     sint w, h, x, y, c0, r0, n, r, c, k, pskip, iskip, dx = 1;
     uint i;
@@ -197,6 +204,7 @@ const char* scm_draw(const char* s, const char* e, const char* m) {
     x = Scm.l + ((Scm.r - Scm.l - w) >> 1);
     y = Scm.t + ((Scm.b - Scm.t - h) >> 1);
     switch (*e) {                                 // first letter
+        case 0:
         case 'c': x = (SCM_W - w) >> 1; y = (SCM_H - h) >> 1; break;  // draw centered
         case 't': y = Scm.t; Scm.t = (y + h < Scm.b) ? y + h : Scm.b; break;
         case 'b': y = Scm.b - h; Scm.b = (y > Scm.t) ? y : Scm.t; break;
@@ -222,11 +230,11 @@ const char* scm_draw(const char* s, const char* e, const char* m) {
             for (c = n; c; c--, p += dx, i++)
                 if ((k = *p) != SCM_TRANS) SCM_DOUBLE[i] = (byte) k;
     }
-    return NONE;
+    return NIL;
 }
 
 // Flush off-screen buffer to screen: two pixel rows per text row
-const char* scm_show(void) {
+node scm_show(void) {
     volatile uint _far* v = (volatile uint _far*) SCM_SCREEN;
     byte _far* p = SCM_DOUBLE;                 // top pixel of the current cell
     uint r, c;
@@ -237,13 +245,13 @@ const char* scm_show(void) {
     scm_cursor();
     Fresh = TRUE;
     scm_clear();
-    return NONE;
+    return NIL;
 }
 
 // Dispatch ####################################################################
 
-// Run command a[0] with arguments a[1], a[2], a[3]: error message or NONE
-const char* scm_run(const char** a) {
+// Run command a[0] with arguments a[1], a[2], a[3]: error message or NIL
+node scm_run(const char** a) {
     if (streq(a[0], "key"))   return scm_key();
     if (streq(a[0], "reset")) return scm_reset();
     if (Restarted) {
@@ -254,8 +262,8 @@ const char* scm_run(const char** a) {
         Scm.top = 0;
         scm_clear();
     }
-    if (streq(a[0], "set?")) return "true";
-    if (streq(a[0], "load")) return scm_load(a[1], a[2]);
+    if (streq(a[0], "set?")) return K_TRUE;
+    if (streq(a[0], "load")) return scm_load(a[1], a[2], a[3]);
     if (streq(a[0], "draw")) return scm_draw(a[1], a[2], a[3]);
     if (streq(a[0], "show")) return scm_show();
     return scm_fail("unknown");
@@ -264,7 +272,6 @@ const char* scm_run(const char** a) {
 // (scm sym [sym [sym [sym]]]): symbol, nil or ERR
 node scm(node x) {
     const char* a[4];
-    const char* r;
     node p, s;
     sint i = 0;
     SYNTAX_IF(x, 1, 4);
@@ -274,8 +281,6 @@ node scm(node x) {
         ERROR_IF((s != NIL) && !isSymbol(s), Type, x);
         a[i++] = (s == NIL) ? "" : symstr(s);
     }
-    Scm.errored = FALSE;
-    r = scm_run(a);
-    if (Scm.errored) return r ? error(r, x) : ERR;
-    return r ? add_sym(r, UNDEF) : NIL;
+    Scm.x = x;
+    return scm_run(a);
 }
